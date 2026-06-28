@@ -20,7 +20,7 @@ from .fetchers import (
     fetch_metacritic_data, fetch_wikipedia_data, fetch_mobygames_data,
 )
 
-DEFAULT_HTML_FILENAME = "game_info.html"
+DEFAULT_HTML_FILENAME = "00_GAME_INFO.html"
 
 
 async def _cached(cache, namespace, key, factory):
