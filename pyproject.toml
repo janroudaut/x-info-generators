@@ -6,8 +6,11 @@ build-backend = "hatchling.build"
 name = "x-info-generators"
 version = "1.1.0"
 description = "Generate self-contained HTML info pages for games, movies and TV series"
+readme = "README.md"
 license = "WTFPL"
 license-files = ["LICENSE"]
+authors = [{ name = "Jan Roudaut" }]
+keywords = ["html", "catalog", "metadata", "steam", "imdb", "metacritic", "tvmaze", "games", "movies", "tv-series", "offline"]
 requires-python = ">=3.11"
 dependencies = [
     "aiohttp",
@@ -20,9 +23,14 @@ dependencies = [
     "Pillow",
 ]
 
+[project.urls]
+Homepage = "https://github.com/janroudaut/x-info-generators"
+Repository = "https://github.com/janroudaut/x-info-generators"
+Issues = "https://github.com/janroudaut/x-info-generators/issues"
+
 [project.scripts]
-game-info-gen = "x_info_generators.game.cli:main"
 video-info-gen = "x_info_generators.video.cli:main"
+game-info-gen = "x_info_generators.game.cli:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/x_info_generators"]
