@@ -9,6 +9,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 uv run game-info-gen /path/to/game
 uv run video-info-gen /path/to/movie.mkv
 
+# Build a browsable catalog from already-generated pages (no network, no generation)
+uv run video-info-gen --index catalog.html /path/to/videos/
+
 # Install globally as user commands (production, after any change)
 uv tool install --force --reinstall .
 ```
@@ -29,8 +32,8 @@ The package exposes two independent entry points (`game-info-gen`, `video-info-g
 1. **CLI** (`game/cli.py` or `video/cli.py`) — parses args, iterates items, calls `process_*`
 2. **Processing** (`game/processing.py` or `video/processing.py`) — orchestrates fetchers with `asyncio.gather`, merges data, downloads and encodes images, renders HTML
 3. **Fetchers** (`game/fetchers.py` or `video/fetchers.py`) — one `async def fetch_*` per data source, return `Optional[Dict]` or `None` on failure
-4. **Templates** (`templates/game_info.html.j2`, `templates/movie_info.html.j2`) — Jinja2, extend `base.html.j2`; rendered via `templates.py`
-5. **Output** — a single self-contained `.html` file written to disk (all images as base64 WebP data URIs)
+4. **Templates** (`templates/{game_info,movie_info,series_info,season_info,index}.html.j2`) — Jinja2; all extend `base.html.j2` except `index` (standalone catalog); rendered via `templates.py`
+5. **Output** — a single self-contained `.html` per item (all images as base64 WebP). Game pages are named `00_GAME_INFO.html`. Separately, `index.py` builds a catalog `index.html` by scanning already-generated pages (`--index`).
 
 ### Shared modules
 
@@ -58,17 +61,19 @@ The package exposes two independent entry points (`game-info-gen`, `video-info-g
 | Source | Endpoint / method |
 |--------|-------------------|
 | Steam | `store.steampowered.com/api/storesearch` → `/api/appdetails` → `/appreviews/{id}` |
-| Metacritic | HTML scraping of `/game/pc/{slug}/` |
-| Wikipedia | `wikipedia` Python library (sync, run in executor) |
+| Metacritic | HTML scraping of `/game/{slug}/` (score via JSON-LD) |
 | MobyGames | HTML scraping of search results then game page |
-| FreeIMDb | `api.imdbapi.dev/search/titles` → `/titles/{id}` (not `imdbapi.dev`) |
-| FFmpeg | `ffmpeg-python` for screenshot extraction (optional — skipped with a warning if not in PATH) |
-| Rotten Tomatoes | Google search scraping to find RT URL |
+| Wikidata | Resolves a movie's IMDb id (CirrusSearch full-text + label search) |
+| imdbapi.dev | `api.imdbapi.dev/titles/{id}` + `/credits` for movies (note: `api.imdbapi.dev`, not `imdbapi.dev`) |
+| TVmaze | Series + all episodes + cast in one `singlesearch` call |
+| Rotten Tomatoes | Slug `m/{slug}` (movies) or `/tv/{slug}` (series) resolved by a direct GET — no Google scraping |
+| Wikipedia | `wikipedia` Python library (sync, run in executor) |
 | YouTube | Scraping `ytInitialData` JSON from search results page |
+| FFmpeg | `ffmpeg-python` for screenshot extraction (optional — skipped with a warning if not in PATH) |
 
 ### Template inheritance
 
-`base.html.j2` provides dark-theme CSS and the outer HTML shell. `game_info.html.j2` and `movie_info.html.j2` extend it via `{% extends "base.html.j2" %}` and fill `{% block content %}`. The `score_color_class` filter maps numeric scores to CSS classes (`score-green`, `score-yellow`, `score-red`).
+`base.html.j2` provides dark-theme CSS and the outer HTML shell. `game_info.html.j2` and `movie_info.html.j2` extend it via `{% extends "base.html.j2" %}` and fill `{% block content %}`. The `score_color_class` filter maps numeric scores to CSS classes (`score-9x` … `score-0x`, plus `score-unknown`).
 
 ## `orig/` directory
 
