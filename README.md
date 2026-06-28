@@ -1,5 +1,9 @@
 # x-info-generators
 
+[![License: WTFPL](https://img.shields.io/badge/license-WTFPL-brightgreen.svg)](LICENSE)
+[![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)](pyproject.toml)
+[![uv](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/uv/main/assets/badge/v0.json)](https://github.com/astral-sh/uv)
+
 Generate self-contained HTML info pages for local **game directories**, **movie files**, and **TV series**.
 
 Each generated `.html` is a single portable file — zero external dependencies, no CDN, no JS/CSS imports. All images are optimized (WebP via Pillow) and embedded as base64 data URIs. Fetched data is cached on disk, so re-runs are near-instant and can run fully offline.
@@ -124,6 +128,7 @@ video-info-gen --purge-cache --cache-ttl 0             # wipe the cache
 | `--debug` | Print aggregated data for debugging |
 | `--max-screenshots N` | Limit number of screenshots (default: 8) |
 | `-V, --version` | Show version |
+| **`-h, --help`** | **Full, authoritative CLI reference (run it for the complete, up-to-date option list)** |
 
 `--ignore` is specific to `video-info-gen`.
 
