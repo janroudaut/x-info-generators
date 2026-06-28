@@ -6,7 +6,7 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 ## [1.1.0] — 2026-06-29
 
 ### Added
-- **Catalog (`--index`)** — build a single, self-contained, browsable `index.html`
+- **Catalog (`--index`)** — build a single, self-contained, browsable `00_INDEX.html`
   from the pages **already generated** on disk: client-side search, type filter and
   sort, downscaled inlined thumbnails. No generation, no network.
   - `--title TEXT` to set the page title; a single-type catalog drops the type filter

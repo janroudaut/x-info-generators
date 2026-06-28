@@ -47,10 +47,10 @@ def add_common_arguments(parser: argparse.ArgumentParser):
         "--purge-cache", action="store_true", dest="purge_cache",
         help="Delete cache entries older than --cache-ttl days, then exit.")
     parser.add_argument(
-        "--index", nargs="?", const="catalog.html", default=None, metavar="OUTPUT",
+        "--index", nargs="?", const="00_INDEX.html", default=None, metavar="OUTPUT",
         help="Build a browsable catalog of already-generated pages found under the "
              "given paths, then exit (no generation, no network). Writes OUTPUT "
-             "(default: catalog.html).")
+             "(default: 00_INDEX.html).")
     parser.add_argument(
         "--max-depth", type=int, default=5, metavar="N",
         help="Max directory depth scanned by --index (default: 5).")

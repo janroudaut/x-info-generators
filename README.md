@@ -77,25 +77,25 @@ A full game page — description, details, Metacritic + Steam reviews, links and
 
 ## 🗂️ Catalog (`--index`)
 
-`--index` builds a single, browsable **catalog** from the pages **already generated** on disk — no generation, no network. It scans the given paths for generated `.html`, reads each page (title, type, year, ratings, poster) and writes a self-contained `index.html` with client-side **search, filter and sort**. The video catalog is the page at the top of this README; here's a games one:
+`--index` builds a single, browsable **catalog** from the pages **already generated** on disk — no generation, no network. It scans the given paths for generated `.html`, reads each page (title, type, year, ratings, poster) and writes a self-contained catalog file (`00_INDEX.html` by default) with client-side **search, filter and sort**. The video catalog is the page at the top of this README; here's a games one:
 
 <p align="center">
   <img src="assets/screenshots/catalog-games.png" width="760" alt="A games catalog">
 </p>
 
 ```bash
-# a videos catalog
-video-info-gen --index catalog.html /path/to/videos/
+# a videos catalog (writes 00_INDEX.html)
+video-info-gen --index 00_INDEX.html /path/to/videos/
 
 # a games catalog
-game-info-gen --index catalog.html /path/to/games/
+game-info-gen --index 00_INDEX.html /path/to/games/
 ```
 
 A single-type catalog drops the type filter and names itself after that type (e.g. **Games**). The type is read from each page — so you *can* point one run at several roots for a combined catalog, but per-category is the usual case. Posters/headers are downscaled and inlined (one portable file); season pages are left out.
 
 | Flag | Description |
 |------|-------------|
-| `--index [OUTPUT]` | Build the catalog under the given paths, then exit (default: `catalog.html`) |
+| `--index [OUTPUT]` | Build the catalog under the given paths, then exit (default: `00_INDEX.html`) |
 | `--title TEXT` | Catalog page title (default: derived — the single type if there's only one, else "Catalog") |
 | `--max-depth N` | Max directory depth scanned by `--index` (default: 5) |
 | `--wsl` | Emit Windows `file://` links (e.g. `D:/…`) for `/mnt/<drive>/` paths, so a catalog built under WSL opens correctly in a Windows browser |
@@ -206,7 +206,7 @@ src/x_info_generators/
 ├── cache.py             # FetchCache (on-disk cache), purge_cache
 ├── processing.py        # ItemStats, RunStats, print_run_summary, cleanup_html_files
 ├── cli.py               # Common CLI arguments
-├── index.py             # --index catalog: scan generated pages → index.html
+├── index.py             # --index catalog: scan generated pages → 00_INDEX.html
 ├── templates.py         # Jinja2 rendering, score_color_class & linebreaks filters
 ├── templates/
 │   ├── base.html.j2     # Common dark theme CSS, HTML structure

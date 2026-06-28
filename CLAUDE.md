@@ -10,7 +10,7 @@ uv run game-info-gen /path/to/game
 uv run video-info-gen /path/to/movie.mkv
 
 # Build a browsable catalog from already-generated pages (no network, no generation)
-uv run video-info-gen --index catalog.html /path/to/videos/
+uv run video-info-gen --index 00_INDEX.html /path/to/videos/
 
 # Install globally as user commands (production, after any change)
 uv tool install --force --reinstall .
@@ -33,7 +33,7 @@ The package exposes two independent entry points (`game-info-gen`, `video-info-g
 2. **Processing** (`game/processing.py` or `video/processing.py`) — orchestrates fetchers with `asyncio.gather`, merges data, downloads and encodes images, renders HTML
 3. **Fetchers** (`game/fetchers.py` or `video/fetchers.py`) — one `async def fetch_*` per data source, return `Optional[Dict]` or `None` on failure
 4. **Templates** (`templates/{game_info,movie_info,series_info,season_info,index}.html.j2`) — Jinja2; all extend `base.html.j2` except `index` (standalone catalog); rendered via `templates.py`
-5. **Output** — a single self-contained `.html` per item (all images as base64 WebP). Game pages are named `00_GAME_INFO.html`. Separately, `index.py` builds a catalog `index.html` by scanning already-generated pages (`--index`).
+5. **Output** — a single self-contained `.html` per item (all images as base64 WebP). Game pages are named `00_GAME_INFO.html`. Separately, `index.py` builds a catalog (`00_INDEX.html` by default) by scanning already-generated pages (`--index`).
 
 ### Shared modules
 
