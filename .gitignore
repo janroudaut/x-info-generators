@@ -34,3 +34,6 @@ Thumbs.db
 
 # Original reference scripts (kept locally, not versioned)
 orig/
+
+# Local scratch (test catalogs, sample symlinks, screenshots…)
+tmp/
