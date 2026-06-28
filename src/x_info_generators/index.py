@@ -193,10 +193,8 @@ def _href(out_dir: Path, html_path: Path, wsl: bool = False) -> str:
 def _iter_html(roots, output_path: Path, max_depth: int = 5):
     """Yield ``*.html`` candidates under ``roots``, deduped, as a stream.
 
-    Uses ``os.walk`` and avoids a per-file ``resolve()`` (each stat is costly on
-    WSL drvfs / network mounts) so results flow from the first file found rather
-    than after walking the whole tree. ``max_depth`` caps recursion depth
-    (0 = the root directory itself).
+    Walks with ``os.walk`` (following symlinked directories) and avoids a per-file
+    ``resolve()``. ``max_depth`` caps recursion depth (0 = the root itself).
     """
     seen = set()
     for root in roots:
@@ -209,11 +207,10 @@ def _iter_html(roots, output_path: Path, max_depth: int = 5):
         if not root.is_dir():
             continue
         base_depth = len(root.parts)
-        for dirpath, dirnames, filenames in os.walk(root):
-            # Limit how deep we descend (depth 0 = the root itself).
+        for dirpath, dirnames, filenames in os.walk(root, followlinks=True):
             depth = len(Path(dirpath).parts) - base_depth
             if depth >= max_depth:
-                dirnames[:] = []  # don't recurse any further
+                dirnames[:] = []
             for fn in filenames:
                 if not fn.lower().endswith(".html"):
                     continue
@@ -228,9 +225,7 @@ def build_catalog(roots, output_path, log: Callable, max_depth: int = 5,
                   wsl: bool = False) -> Tuple[int, Dict[str, int]]:
     """Scan ``roots`` for generated pages and write a self-contained ``index.html``.
 
-    Pages are found and parsed in a single stream (no upfront full-tree scan), so
-    progress shows from the first file — important on slow mounts where walking a
-    whole library can take a while.
+    Pages are found and parsed in a single stream (no upfront full-tree scan).
     """
     output_path = Path(output_path).resolve()
     out_dir = output_path.parent
@@ -274,8 +269,7 @@ def build_catalog(roots, output_path, log: Callable, max_depth: int = 5,
         version=__version__,
         generated_at=time.strftime("%Y-%m-%d %H:%M:%S"),
     )
-    # Atomic write: render to a temp file in the same directory, then os.replace
-    # (an atomic rename), so an interrupt can never leave a partial/clobbered file.
+    # Write atomically: temp file in the same directory + os.replace (atomic rename).
     output_path.parent.mkdir(parents=True, exist_ok=True)
     tmp = output_path.with_name(f".{output_path.name}.{os.getpid()}.tmp")
     try:
