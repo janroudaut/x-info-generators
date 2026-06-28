@@ -15,10 +15,12 @@ header h1 { color: #569cd6; font-size: 2.2em; margin: 0 0 4px; }
 .toolbar input, .toolbar select { background-color: #2d2d2d; color: #d4d4d4; border: 1px solid #444; border-radius: 6px; padding: 8px 10px; font-size: 0.95em; }
 .toolbar input { flex: 1 1 240px; }
 .toolbar input:focus, .toolbar select:focus { outline: none; border-color: #569cd6; }
-.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 16px; }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 16px; }
 .card { display: flex; flex-direction: column; background-color: #2a2a2a; border-radius: 8px; overflow: hidden; text-decoration: none; color: inherit; border: 1px solid #383838; transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease; }
 .card:hover { transform: translateY(-4px); box-shadow: 0 8px 18px rgba(0,0,0,0.45); border-color: #569cd6; }
 .thumb { position: relative; width: 100%; aspect-ratio: 2 / 3; background-color: #1a1a1a; }
+/* Games use a landscape Steam header, not a portrait poster. */
+.thumb-game { aspect-ratio: 16 / 9; }
 .thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .thumb .noimg { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; color: #555; font-size: 2.5em; }
 .kind { position: absolute; top: 8px; left: 8px; font-size: 0.72em; font-weight: bold; text-transform: uppercase; letter-spacing: 0.04em; padding: 3px 7px; border-radius: 4px; color: #fff; }
@@ -28,9 +30,9 @@ header h1 { color: #569cd6; font-size: 2.2em; margin: 0 0 4px; }
 .meta { padding: 10px; display: flex; flex-direction: column; gap: 6px; flex: 1; }
 .title { font-weight: 600; font-size: 0.95em; line-height: 1.25; }
 .year { color: #9a9a9a; font-size: 0.85em; }
-.badges { display: flex; flex-wrap: wrap; gap: 6px; margin-top: auto; padding-top: 4px; }
-.badge { display: inline-flex; align-items: center; gap: 4px; font-size: 0.78em; }
-.score { font-weight: bold; padding: 2px 6px; border-radius: 4px; color: white; }
+.badges { display: flex; flex-wrap: nowrap; gap: 8px; margin-top: auto; padding-top: 6px; }
+.badge { display: inline-flex; align-items: center; gap: 3px; font-size: 0.72em; color: #9a9a9a; white-space: nowrap; }
+.score { font-weight: bold; padding: 1px 5px; border-radius: 3px; color: white; }
 .score-9x { background-color: #4CAF50; }
 .score-8x { background-color: #8BC34A; }
 .score-7x { background-color: #CDDC39; color: #333; }
@@ -40,7 +42,7 @@ header h1 { color: #569cd6; font-size: 2.2em; margin: 0 0 4px; }
 .score-unknown { background-color: #777; }
 #empty { display: none; text-align: center; color: #888; padding: 50px 0; font-size: 1.1em; }
 footer { text-align: center; margin-top: 30px; padding-top: 15px; border-top: 1px solid #383838; font-size: 0.85em; color: #777; }
-@media (max-width: 600px) { .grid { grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 10px; } header h1 { font-size: 1.6em; } }
+@media (max-width: 600px) { .grid { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; } header h1 { font-size: 1.6em; } .badges { flex-wrap: wrap; } }
 </style>
 </head>
 <body>
@@ -55,9 +57,9 @@ footer { text-align: center; margin-top: 30px; padding-top: 15px; border-top: 1p
 {% if show_type_filter %}
 <select id="type">
 <option value="all">All types</option>
-<option value="game">Games</option>
-<option value="movie">Movies</option>
-<option value="series">Series</option>
+{% if by_kind.game %}<option value="game">Games</option>{% endif %}
+{% if by_kind.movie %}<option value="movie">Movies</option>{% endif %}
+{% if by_kind.series %}<option value="series">Series</option>{% endif %}
 </select>
 {% endif %}
 <select id="sort">
@@ -70,9 +72,9 @@ footer { text-align: center; margin-top: 30px; padding-top: 15px; border-top: 1p
 <div class="grid" id="grid">
 {% for e in entries %}
 <a class="card" href="{{ e.href }}" data-kind="{{ e.kind }}" data-title="{{ e.title | lower }}" data-year="{{ e.year or '' }}" data-score="{{ '%.3f' | format(e.sort_score) }}">
-<div class="thumb">
+<div class="thumb thumb-{{ e.kind }}">
 {% if e.thumb %}<img src="{{ e.thumb }}" alt="" loading="lazy">{% else %}<div class="noimg">{% if e.kind == 'game' %}🎮{% elif e.kind == 'series' %}📺{% else %}🎬{% endif %}</div>{% endif %}
-<span class="kind kind-{{ e.kind }}">{{ e.kind }}</span>
+{% if show_type_filter %}<span class="kind kind-{{ e.kind }}">{{ e.kind }}</span>{% endif %}
 </div>
 <div class="meta">
 <div class="title">{{ e.title }}</div>
