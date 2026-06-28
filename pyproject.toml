@@ -1,0 +1,26 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "x-info-generators"
+version = "1.0.0"
+description = "Generate self-contained HTML info pages for games, movies and TV series"
+requires-python = ">=3.11"
+dependencies = [
+    "aiohttp",
+    "beautifulsoup4",
+    "lxml",
+    "tqdm",
+    "wikipedia",
+    "ffmpeg-python",
+    "jinja2",
+    "Pillow",
+]
+
+[project.scripts]
+game-info-gen = "x_info_generators.game.cli:main"
+video-info-gen = "x_info_generators.video.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/x_info_generators"]

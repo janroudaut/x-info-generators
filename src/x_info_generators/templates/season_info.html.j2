@@ -1,0 +1,46 @@
+{% extends "base.html.j2" %}
+{% import "_series_macros.html.j2" as m %}
+
+{% block title %}{{ data.series_title }} - Season {{ data.season_number }}{% endblock %}
+
+{% block extra_css %}
+.season-layout { display: grid; grid-template-columns: 1fr; gap: 25px; }
+@media (min-width: 992px) { .season-layout { grid-template-columns: 240px 1fr; } }
+.poster-section { text-align: center; }
+.header-image { max-width: 240px; width: 100%; border-radius: 6px; display: block; margin: 0 auto; }
+.episodes-section { background-color: #333; padding: 20px; border-radius: 6px; }
+.back-link { display: inline-block; margin-bottom: 12px; }
+.season-count { color: #9a9a9a; font-size: 0.9em; }
+.episodes-table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+.episodes-table td { padding: 6px 8px; border-bottom: 1px solid #444; vertical-align: top; }
+.episodes-table tr:last-child td { border-bottom: none; }
+.ep-mark { color: #9fe09f; width: 22px; text-align: center; font-weight: bold; }
+.ep-num { color: #888; width: 34px; text-align: right; font-variant-numeric: tabular-nums; }
+.ep-missing-row { opacity: 0.5; }
+.ep-title .ep-name { font-weight: 600; }
+.ep-plot { display: block; color: #aaa; font-size: 0.88em; margin-top: 2px; }
+.ep-rating { width: 70px; text-align: right; }
+.ep-rating .score { padding: 2px 6px; font-size: 0.85em; }
+{% endblock %}
+
+{% block header %}
+<header>
+<h1>{{ data.series_title }} &ndash; Season {{ data.season_number }}</h1>
+</header>
+{% endblock %}
+
+{% block content %}
+<p><a href="{{ data.series_page_link }}" class="back-link">&larr; Back to series</a></p>
+<div class="season-layout">
+<aside class="poster-section">
+{% if data.poster_src %}<img src="{{ data.poster_src }}" alt="Poster for {{ data.series_title }}" class="header-image">{% endif %}
+</aside>
+<main class="episodes-section">
+<h2>Episodes <span class="season-count">({{ data.owned_count }} / {{ data.total_count }} in library)</span></h2>
+{{ m.episode_list(data.episodes) }}
+{% if data.imdb_id %}
+<p style="margin-top:15px;"><a href="https://www.imdb.com/title/{{ data.imdb_id }}" target="_blank" rel="noopener noreferrer">IMDb Page</a></p>
+{% endif %}
+</main>
+</div>
+{% endblock %}

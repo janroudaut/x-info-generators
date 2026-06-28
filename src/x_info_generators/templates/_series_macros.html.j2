@@ -1,0 +1,60 @@
+{% macro format_score(score) %}
+{% if score is number %}<span class="score {{ score | score_color_class }}">{{ score }}</span>{% else %}<span class="score score-unknown">N/A</span>{% endif %}
+{% endmacro %}
+
+{% macro person_link(person) %}
+<a href="https://www.imdb.com/name/{{ person.id }}" target="_blank" rel="noopener noreferrer">{{ person.name }}</a>
+{% endmacro %}
+
+{% macro name_link(person) %}
+{% if person.url %}<a href="{{ person.url }}" target="_blank" rel="noopener noreferrer">{{ person.name }}</a>{% else %}{{ person.name }}{% endif %}
+{% endmacro %}
+
+{% macro ratings_block(data) %}
+{% set has_ratings = (data.rating is number) or (data.rt_critics_score is number) or (data.rt_audience_score is number) %}
+{% if has_ratings %}
+<div class="ratings">
+{% if data.rating is number %}
+<a class="rating-badge" {% if data.imdb_id %}href="https://www.imdb.com/title/{{ data.imdb_id }}"{% endif %} target="_blank" rel="noopener noreferrer">
+<span class="rating-name">IMDb</span><span class="score {{ data.rating | score_color_class }}">{{ data.rating }}</span>
+</a>
+{% endif %}
+{% if data.rt_critics_score is number %}
+<a class="rating-badge" href="{{ data.rotten_tomatoes_url }}" target="_blank" rel="noopener noreferrer">
+<span class="rating-name">🍅 Tomatometer{% if data.rt_critics_certified %} ✓{% endif %}</span><span class="score {{ data.rt_critics_score | score_color_class(100) }}">{{ data.rt_critics_score }}%</span>
+</a>
+{% endif %}
+{% if data.rt_audience_score is number %}
+<a class="rating-badge" href="{{ data.rotten_tomatoes_url }}" target="_blank" rel="noopener noreferrer">
+<span class="rating-name">🍿 Audience</span><span class="score {{ data.rt_audience_score | score_color_class(100) }}">{{ data.rt_audience_score }}%</span>
+</a>
+{% endif %}
+</div>
+{% endif %}
+{% endmacro %}
+
+{% macro cast_list(cast) %}
+<div class="cast-list">
+{% for a in cast %}
+<div class="cast-member">
+{% if a.image_src %}<img class="cast-photo" src="{{ a.image_src }}" alt="{{ a.name }}" loading="lazy">{% else %}<div class="cast-photo cast-photo-empty"></div>{% endif %}
+<div class="cast-info">{% if a.url %}<a href="{{ a.url }}" target="_blank" rel="noopener noreferrer">{{ a.name }}</a>{% else %}<span>{{ a.name }}</span>{% endif %}{% if a.character %}<span class="cast-char">{{ a.character }}</span>{% endif %}</div>
+</div>
+{% endfor %}
+</div>
+{% endmacro %}
+
+{% macro episode_list(episodes) %}
+<table class="episodes-table">
+<tbody>
+{% for e in episodes %}
+<tr class="{{ 'ep-owned-row' if e.owned else 'ep-missing-row' }}">
+<td class="ep-mark">{% if e.owned %}✓{% endif %}</td>
+<td class="ep-num">{{ e.number }}</td>
+<td class="ep-title"><span class="ep-name">{{ e.title }}</span>{% if e.plot %}<span class="ep-plot">{{ e.plot }}</span>{% endif %}</td>
+<td class="ep-rating">{% if e.rating is number %}{{ format_score(e.rating) }}{% endif %}</td>
+</tr>
+{% endfor %}
+</tbody>
+</table>
+{% endmacro %}

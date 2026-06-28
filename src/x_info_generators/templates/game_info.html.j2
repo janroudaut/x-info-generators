@@ -1,0 +1,162 @@
+{% extends "base.html.j2" %}
+
+{% block title %}{{ data.name }} - Game Info{% endblock %}
+
+{% block extra_css %}
+p { margin-bottom: 1em; }
+.main-content-grid { display: grid; grid-template-columns: 1fr; gap: 25px; }
+@media (min-width: 992px) { .main-content-grid { grid-template-columns: 2fr 1fr; } .description-section { grid-column: 1 / 2; } .sidebar-section { grid-column: 2 / 3; display: flex; flex-direction: column; } }
+.header-image { max-width: 100%; max-height: 300px; width: auto; border-radius: 6px; margin-bottom: 15px; object-fit: cover; display: block; margin-left: auto; margin-right: auto; }
+.description-content { background-color: #333; padding: 15px; border-radius: 5px; margin-top: 10px; overflow: hidden; }
+.description-content p { margin-bottom: 0.5em; }
+.description-content p:last-child { margin-bottom: 0; }
+.screenshot { width: 100%; height: auto; border-radius: 4px; border: 2px solid #444; object-fit: cover; transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out; }
+.screenshot:hover { transform: scale(1.03); box-shadow: 0 0 10px rgba(86,156,214,0.7); }
+.section-box { background-color: #333; padding: 20px; border-radius: 6px; margin-bottom: 20px; }
+.review { border-left: 4px solid #569cd6; padding-left: 15px; margin-bottom: 20px; background-color: #383838; padding: 15px; border-radius: 0 5px 5px 0; }
+.review strong { color: #9cdcfe; }
+.review-score { background-color: #4f4f4f; padding: 2px 8px; border-radius: 3px; font-size: 0.85em; margin-left: 8px; }
+.rec-badge { font-weight: bold; padding: 2px 8px; border-radius: 3px; font-size: 0.85em; }
+.rec-yes { background-color: #2e5e2e; color: #9fe09f; }
+.rec-no { background-color: #5e2e2e; color: #ff9b9b; }
+.review blockquote { margin: 8px 0 8px 20px; font-style: italic; color: #b0b0b0; border-left: 2px solid #555; padding-left: 10px; }
+.score-section p { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.star-rating { font-size: 1.2em; color: #ffc107; margin-left: 5px; }
+.star.empty { color: #555; }
+.details-table th { width: 35%; }
+@media (max-width: 768px) {
+  .section-box { padding: 15px; margin-bottom: 15px; }
+  .description-content { padding: 12px; }
+  .review { padding: 12px; margin-bottom: 15px; }
+  .review blockquote { margin-left: 10px; }
+}
+@media (max-width: 480px) {
+  .section-box { padding: 12px; border-radius: 4px; }
+  .description-content { padding: 10px; }
+  .review blockquote { margin-left: 0; padding-left: 8px; }
+  .details-table th { width: 100%; }
+}
+{% endblock %}
+
+{# --- Macros --- #}
+{% macro score_to_stars(score_value, max_stars=5) %}
+{% if score_value is number and score_value >= 0 and score_value <= 100 %}
+{% set num_filled = ((score_value / 100) * max_stars) | round(0, 'common') | int %}
+<span class="star-rating">
+{%- for i in range(max_stars) -%}
+{% if i < num_filled %}<span class="star filled">★</span>{% else %}<span class="star empty">☆</span>{% endif %}
+{%- endfor -%}
+</span>
+{% endif %}
+{% endmacro %}
+
+{% macro render_score(score_val, metacritic_url) %}
+{% if score_val is number %}
+{% set color_class = score_val | score_color_class(scale=100) %}
+{% if metacritic_url %}
+<a href="{{ metacritic_url }}" target="_blank" rel="noopener noreferrer" title="View on Metacritic"><span class="score {{ color_class }}">{{ score_val }}</span></a>
+{% else %}
+<span class="score {{ color_class }}">{{ score_val }}</span>
+{% endif %}
+{% else %}
+<span class="score score-unknown">N/A</span>
+{% endif %}
+{% endmacro %}
+
+{% block header %}
+<header>
+{% if data.header_image_src %}
+<img src="{{ data.header_image_src }}" alt="Header for {{ data.name }}" class="header-image">
+{% endif %}
+<h1>{{ data.name }}</h1>
+</header>
+{% endblock %}
+
+{% block content %}
+<div class="main-content-grid">
+<section class="description-section section-box">
+<h2>Description</h2>
+<div class="description-content">
+{% if data.description_html %}
+{{ data.description_html | safe }}
+{% elif data.description_text %}
+{% for para in data.description_text.split('\n') %}
+{% if para.strip() %}<p>{{ para.strip() }}</p>{% endif %}
+{% endfor %}
+{% else %}
+<p>No description available.</p>
+{% endif %}
+</div>
+</section>
+
+<aside class="sidebar-section">
+<section class="section-box" id="details">
+<h2>Game Details</h2>
+{% set has_details = data.release_date or data.developers or data.publishers or data.genres %}
+{% if has_details %}
+<table class="details-table">
+{% if data.release_date %}<tr><th>Released:</th><td>{{ data.release_date }}</td></tr>{% endif %}
+{% if data.developers %}<tr><th>Developers:</th><td>{{ data.developers | join(", ") }}</td></tr>{% endif %}
+{% if data.publishers %}<tr><th>Publishers:</th><td>{{ data.publishers | join(", ") }}</td></tr>{% endif %}
+{% if data.genres %}<tr><th>Genres:</th><td>{{ data.genres | join(", ") }}</td></tr>{% endif %}
+</table>
+{% else %}
+<p>No specific game details available.</p>
+{% endif %}
+</section>
+
+<section class="section-box" id="scores">
+<h2>Scores &amp; Reviews</h2>
+{% set mc_score = data.metacritic_score if data.metacritic_score is defined else data.get('metacritic_score_from_steam') %}
+{% set mc_url = data.metacritic_url if data.metacritic_url is defined else data.get('metacritic_url_from_steam') %}
+<div class="score-section">
+<p><strong>Metacritic Score:</strong> {{ render_score(mc_score, mc_url) }} {{ score_to_stars(mc_score) }}</p>
+</div>
+{% if data.reviews %}
+{% for review in data.reviews %}
+<div class="review">
+<p><strong>{{ review.source | default("Unknown Source") }}:</strong>
+{% if review.recommendation %}<span class="rec-badge {{ 'rec-yes' if review.recommended else 'rec-no' }}">{{ review.recommendation }}</span>{% endif %}
+<span class="review-score">{{ review.score | default("N/A") }}</span></p>
+<blockquote>"{{ review.snippet | default("No snippet.") }}"
+{% if review.url %}<p><a href="{{ review.url }}" target="_blank" rel="noopener noreferrer">Read full review &raquo;</a></p>{% endif %}
+</blockquote>
+</div>
+{% endfor %}
+{% else %}
+<p>No reviews available for this game.</p>
+{% endif %}
+</section>
+
+<section class="section-box" id="links">
+<h2>Links</h2>
+{% set has_links = data.website or data.steam_url or data.metacritic_url or data.metacritic_url_from_steam or data.wikipedia_url or data.mobygames_url %}
+{% if has_links %}
+<ul>
+{% if data.website %}<li><a href="{{ data.website }}" target="_blank" rel="noopener noreferrer">Official Website</a></li>{% endif %}
+{% if data.steam_url %}<li><a href="{{ data.steam_url }}" target="_blank" rel="noopener noreferrer">Steam Page</a></li>{% endif %}
+{% if data.metacritic_url or data.metacritic_url_from_steam %}<li><a href="{{ data.metacritic_url or data.metacritic_url_from_steam }}" target="_blank" rel="noopener noreferrer">Metacritic Page</a></li>{% endif %}
+{% if data.wikipedia_url %}<li><a href="{{ data.wikipedia_url }}" target="_blank" rel="noopener noreferrer">Wikipedia Page</a></li>{% endif %}
+{% if data.mobygames_url %}<li><a href="{{ data.mobygames_url }}" target="_blank" rel="noopener noreferrer">MobyGames Page</a></li>{% endif %}
+<li><a href="https://www.youtube.com/results?search_query={{ (data.name ~ ' gameplay') | urlencode }}" target="_blank" rel="noopener noreferrer">Search Gameplay on YouTube</a></li>
+</ul>
+{% else %}
+<ul><li><a href="https://www.youtube.com/results?search_query={{ (data.name ~ ' gameplay') | urlencode }}" target="_blank" rel="noopener noreferrer">Search Gameplay on YouTube</a></li></ul>
+{% endif %}
+</section>
+</aside>
+</div>
+
+<section class="section-box" id="screenshots-main">
+<h2>Screenshots</h2>
+<div class="screenshots-container">
+{% if data.screenshot_sources %}
+{% for src in data.screenshot_sources %}
+{% if src %}<a data-lightbox="{{ src }}"><img src="{{ src }}" alt="Screenshot of {{ data.name }}" class="screenshot"></a>{% endif %}
+{% endfor %}
+{% else %}
+<p>No screenshots available.</p>
+{% endif %}
+</div>
+</section>
+{% endblock %}

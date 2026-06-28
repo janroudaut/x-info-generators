@@ -1,0 +1,127 @@
+{% extends "base.html.j2" %}
+{% import "_series_macros.html.j2" as m %}
+
+{% block title %}{{ data.title }} - Movie Info{% endblock %}
+
+{% block extra_css %}
+.main-content-grid { display: grid; grid-template-columns: 1fr; gap: 25px; }
+@media (min-width: 992px) { .main-content-grid { grid-template-columns: 300px 1fr; } .poster-section { grid-column: 1/2; grid-row: 1/2; } .content-section { grid-column: 2/3; grid-row: 1/2; } }
+.poster-section { text-align: center; }
+.header-image { max-width: 300px; width: 100%; border-radius: 6px; margin-bottom: 15px; display: block; margin-left: auto; margin-right: auto; }
+.content-section, .screenshots-section, .videos-section { background-color: #333; padding: 20px; border-radius: 6px; margin-bottom: 25px; }
+.description-content { overflow: hidden; }
+.plot { font-style: italic; }
+.video-card { background-color: #404040; border-radius: 4px; overflow: hidden; transition: transform 0.2s ease, box-shadow 0.2s ease; }
+.video-card:hover { transform: translateY(-5px); box-shadow: 0 8px 15px rgba(0,0,0,0.4); }
+.video-card a { text-decoration: none; color: #d4d4d4; display: block; }
+.video-card img { width: 100%; display: block; border-bottom: 2px solid #569cd6; }
+.video-title { padding: 10px; font-size: 0.9em; min-height: 40px; }
+.videos-container { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 15px; margin-top: 15px; }
+a.trailer-link { font-weight: bold; font-size: 1.1em; color: #ff8a8a; }
+a.trailer-link:hover { color: #ffc1c1; }
+.details-table th { width: 120px; }
+@media (max-width: 768px) {
+  .content-section, .screenshots-section, .videos-section, .cast-section { padding: 15px; margin-bottom: 18px; }
+  .videos-container { grid-template-columns: repeat(auto-fill, minmax(min(200px, 100%), 1fr)); gap: 10px; }
+  .header-image { max-width: 220px; }
+}
+@media (max-width: 480px) {
+  .content-section, .screenshots-section, .videos-section, .cast-section { padding: 12px; margin-bottom: 15px; border-radius: 4px; }
+  .videos-container { grid-template-columns: 1fr 1fr; }
+  .video-title { font-size: 0.8em; min-height: 30px; padding: 8px; }
+  .header-image { max-width: 180px; }
+  .details-table th { width: 100%; }
+}
+{% endblock %}
+
+{# --- Macros --- #}
+{% macro format_score(score) %}
+{% if score is number %}
+{% set color_class = score | score_color_class %}
+<span class="score {{ color_class }}">{{ score }}</span>
+{% else %}
+<span class="score score-unknown">N/A</span>
+{% endif %}
+{% endmacro %}
+
+{% macro person_link(person) %}
+<a href="https://www.imdb.com/name/{{ person.id }}" target="_blank">{{ person.name }}</a>
+{% endmacro %}
+
+{% block header %}
+<header>
+<h1>{{ data.title }} ({{ data.year | default("N/A") }})</h1>
+</header>
+{% endblock %}
+
+{% block content %}
+<div class="main-content-grid">
+<aside class="poster-section">
+{% if data.poster_src %}
+<img src="{{ data.poster_src }}" alt="Poster for {{ data.title }}" class="header-image">
+{% endif %}
+</aside>
+<main class="content-section">
+{{ m.ratings_block(data) }}
+
+{% set directors_str = data.directors | map(attribute='name') | list | join(", ") if data.directors else "" %}
+{% set has_details = directors_str or data.genres or data.year or data.cast %}
+{% if has_details %}
+<table class="details-table">
+{% if directors_str %}
+<tr><th>Director(s)</th><td>
+{% for d in data.directors %}{{ person_link(d) }}{% if not loop.last %}, {% endif %}{% endfor %}
+</td></tr>
+{% endif %}
+{% if data.genres %}<tr><th>Genres</th><td>{{ data.genres | join(", ") }}</td></tr>{% endif %}
+{% if data.year %}<tr><th>Year</th><td>{{ data.year }}</td></tr>{% endif %}
+{% if data.cast %}<tr><td colspan="2">{{ m.cast_list(data.cast) }}</td></tr>{% endif %}
+</table>
+{% endif %}
+
+{% if data.youtube_trailer_url %}
+<ul class="links">
+<li><a href="{{ data.youtube_trailer_url }}" target="_blank" rel="noopener noreferrer" class="trailer-link">▶️ Official Trailer on YouTube</a></li>
+</ul>
+{% endif %}
+
+<h2>Plot Summary</h2>
+<div class="description-content">
+{% if data.plot %}<div class="plot">{{ data.plot | linebreaks }}</div>{% endif %}
+{% if data.wikipedia_summary %}<h2>From Wikipedia</h2>{{ data.wikipedia_summary | linebreaks }}{% if data.wikipedia_url %}<p class="wiki-link"><a href="{{ data.wikipedia_url }}" target="_blank" rel="noopener noreferrer">Wikipedia page</a></p>{% endif %}{% endif %}
+{% if not data.plot and not data.wikipedia_summary %}<p>No description available.</p>{% endif %}
+</div>
+</main>
+</div>
+
+<section class="screenshots-section">
+<h2>Screenshots</h2>
+<div class="screenshots-container">
+{% if data.screenshot_sources %}
+{% for src in data.screenshot_sources %}
+{% if src %}<a data-lightbox="{{ src }}"><img src="{{ src }}" alt="Screenshot of {{ data.title }}"></a>{% endif %}
+{% endfor %}
+{% else %}
+<p>No screenshots available.</p>
+{% endif %}
+</div>
+</section>
+
+<section class="videos-section">
+<h2>Related Videos</h2>
+<div class="videos-container">
+{% if data.youtube_reviews %}
+{% for v in data.youtube_reviews %}
+<div class="video-card">
+<a href="https://www.youtube.com/watch?v={{ v.id }}" target="_blank" rel="noopener noreferrer">
+<img src="{{ v.thumbnail_url }}" alt="Thumbnail for {{ v.title }}">
+<div class="video-title">{{ v.title }}</div>
+</a>
+</div>
+{% endfor %}
+{% else %}
+<p>No related videos found.</p>
+{% endif %}
+</div>
+</section>
+{% endblock %}

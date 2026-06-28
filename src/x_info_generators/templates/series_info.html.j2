@@ -1,0 +1,88 @@
+{% extends "base.html.j2" %}
+{% import "_series_macros.html.j2" as m %}
+
+{% block title %}{{ data.title }} - Series Info{% endblock %}
+
+{% block extra_css %}
+.main-content-grid { display: grid; grid-template-columns: 1fr; gap: 25px; }
+@media (min-width: 992px) { .main-content-grid { grid-template-columns: 300px 1fr; } }
+.poster-section { text-align: center; }
+.header-image { max-width: 300px; width: 100%; border-radius: 6px; margin-bottom: 15px; display: block; margin-left: auto; margin-right: auto; }
+.content-section, .screenshots-section { background-color: #333; padding: 20px; border-radius: 6px; margin-bottom: 25px; }
+.plot { font-style: italic; }
+.details-table th { width: 130px; }
+a.trailer-link { font-weight: bold; font-size: 1.1em; color: #ff8a8a; }
+a.trailer-link:hover { color: #ffc1c1; }
+.season-block { background-color: #383838; padding: 15px 20px; border-radius: 6px; margin-bottom: 18px; }
+.season-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.season-head h3 { color: #9cf; margin: 0; font-size: 1.3em; }
+.season-count { color: #9a9a9a; font-size: 0.85em; white-space: nowrap; }
+.episodes-table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+.episodes-table td { padding: 6px 8px; border-bottom: 1px solid #444; vertical-align: top; }
+.episodes-table tr:last-child td { border-bottom: none; }
+.ep-mark { color: #9fe09f; width: 22px; text-align: center; font-weight: bold; }
+.ep-num { color: #888; width: 34px; text-align: right; font-variant-numeric: tabular-nums; }
+.ep-missing-row { opacity: 0.5; }
+.ep-title .ep-name { font-weight: 600; }
+.ep-plot { display: block; color: #aaa; font-size: 0.88em; margin-top: 2px; }
+.ep-rating { width: 70px; text-align: right; }
+.ep-rating .score { padding: 2px 6px; font-size: 0.85em; }
+{% endblock %}
+
+{% block header %}
+<header>
+<h1>{{ data.title }}{% if data.year %} ({{ data.year }}{% if data.end_year %}&ndash;{{ data.end_year }}{% else %}&ndash;{% endif %}){% endif %}</h1>
+</header>
+{% endblock %}
+
+{% block content %}
+<div class="main-content-grid">
+<aside class="poster-section">
+{% if data.poster_src %}<img src="{{ data.poster_src }}" alt="Poster for {{ data.title }}" class="header-image">{% endif %}
+</aside>
+<main class="content-section">
+{{ m.ratings_block(data) }}
+<table class="details-table">
+{% if data.network %}<tr><th>Network</th><td>{{ data.network }}</td></tr>{% endif %}
+{% if data.genres %}<tr><th>Genres</th><td>{{ data.genres | join(", ") }}</td></tr>{% endif %}
+{% if data.year %}<tr><th>Years</th><td>{{ data.year }}{% if data.end_year %}&ndash;{{ data.end_year }}{% endif %}</td></tr>{% endif %}
+{% if data.total_seasons %}<tr><th>Seasons</th><td>{{ data.total_seasons }}</td></tr>{% endif %}
+{% if data.cast %}<tr><td colspan="2">{{ m.cast_list(data.cast) }}</td></tr>{% endif %}
+</table>
+
+{% if data.youtube_trailer_url %}
+<ul class="links">
+<li><a href="{{ data.youtube_trailer_url }}" target="_blank" rel="noopener noreferrer" class="trailer-link">▶️ Trailer on YouTube</a></li>
+</ul>
+{% endif %}
+
+<h2>Plot Summary</h2>
+<div class="description-content">
+{% if data.plot %}<div class="plot">{{ data.plot | linebreaks }}</div>{% endif %}
+{% if data.wikipedia_summary %}<h2>From Wikipedia</h2>{{ data.wikipedia_summary | linebreaks }}{% if data.wikipedia_url %}<p class="wiki-link"><a href="{{ data.wikipedia_url }}" target="_blank" rel="noopener noreferrer">Wikipedia page</a></p>{% endif %}{% endif %}
+{% if not data.plot and not data.wikipedia_summary %}<p>No description available.</p>{% endif %}
+</div>
+</main>
+</div>
+
+{% for s in data.seasons %}
+<div class="season-block">
+<div class="season-head">
+<h3>Season {{ s.number }}{% if s.page_link %} &middot; <a href="{{ s.page_link }}">open season page</a>{% endif %}</h3>
+<span class="season-count">{{ s.owned_count }} / {{ s.total_count }} in library</span>
+</div>
+{{ m.episode_list(s.episodes) }}
+</div>
+{% endfor %}
+
+{% if data.screenshot_sources %}
+<section class="screenshots-section">
+<h2>Screenshots</h2>
+<div class="screenshots-container">
+{% for src in data.screenshot_sources %}
+{% if src %}<a data-lightbox="{{ src }}"><img src="{{ src }}" alt="Screenshot of {{ data.title }}"></a>{% endif %}
+{% endfor %}
+</div>
+</section>
+{% endif %}
+{% endblock %}
