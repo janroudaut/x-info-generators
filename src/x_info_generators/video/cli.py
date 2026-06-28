@@ -9,6 +9,7 @@ from ..cli import add_common_arguments, setup_environment
 from ..cache import FetchCache, default_cache_root, purge_cache
 from ..http import create_session
 from ..processing import RunStats, print_run_summary
+from ..index import build_catalog
 from ..utils import format_bytes, path_matches_ignore
 from .. import __version__
 from .processing import (
@@ -65,11 +66,24 @@ def _cleanup_movie_files(paths, recursive, log, ignore=None):
 
 
 async def _main_loop(args: argparse.Namespace):
-    setup_environment(args, "Video Info Generator")
+    setup_environment(
+        args,
+        "Creating catalog from HTML files..." if args.index is not None else "Video Info Generator",
+    )
 
     if args.purge_cache:
         removed, freed = purge_cache(default_cache_root(), args.cache_ttl)
         print(f"{D.CLEAN} Cleaned {removed} cache entr{'y' if removed == 1 else 'ies'}, freed {format_bytes(freed)}")
+        return
+
+    if args.index is not None:
+        if not args.paths:
+            print(f"{D.ERROR} --index needs at least one path to scan.")
+            return
+        total, by_kind = build_catalog(args.paths, Path(args.index), print, args.max_depth, args.wsl)
+        print(f"{D.SUCCESS_HTML} Catalog: {total} item(s) "
+              f"({by_kind['game']} games, {by_kind['movie']} movies, {by_kind['series']} series) "
+              f"→ {args.index}")
         return
 
     if not args.paths:

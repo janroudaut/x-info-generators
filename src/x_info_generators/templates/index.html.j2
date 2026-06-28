@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Catalog ({{ total }})</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; }
+body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 0; background-color: #1e1e1e; color: #d4d4d4; line-height: 1.5; }
+.wrap { max-width: 1500px; margin: 0 auto; padding: 20px; }
+header { text-align: center; margin-bottom: 18px; }
+header h1 { color: #569cd6; font-size: 2.2em; margin: 0 0 4px; }
+.counts { color: #9a9a9a; font-size: 0.95em; }
+.toolbar { position: sticky; top: 0; z-index: 5; display: flex; flex-wrap: wrap; gap: 10px; padding: 12px 0; margin-bottom: 16px; background-color: #1e1e1e; border-bottom: 1px solid #383838; }
+.toolbar input, .toolbar select { background-color: #2d2d2d; color: #d4d4d4; border: 1px solid #444; border-radius: 6px; padding: 8px 10px; font-size: 0.95em; }
+.toolbar input { flex: 1 1 240px; }
+.toolbar input:focus, .toolbar select:focus { outline: none; border-color: #569cd6; }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 16px; }
+.card { display: flex; flex-direction: column; background-color: #2a2a2a; border-radius: 8px; overflow: hidden; text-decoration: none; color: inherit; border: 1px solid #383838; transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease; }
+.card:hover { transform: translateY(-4px); box-shadow: 0 8px 18px rgba(0,0,0,0.45); border-color: #569cd6; }
+.thumb { position: relative; width: 100%; aspect-ratio: 2 / 3; background-color: #1a1a1a; }
+.thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.thumb .noimg { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; color: #555; font-size: 2.5em; }
+.kind { position: absolute; top: 8px; left: 8px; font-size: 0.72em; font-weight: bold; text-transform: uppercase; letter-spacing: 0.04em; padding: 3px 7px; border-radius: 4px; color: #fff; }
+.kind-game { background-color: #6a4caf; }
+.kind-movie { background-color: #2e6da4; }
+.kind-series { background-color: #2e8b57; }
+.meta { padding: 10px; display: flex; flex-direction: column; gap: 6px; flex: 1; }
+.title { font-weight: 600; font-size: 0.95em; line-height: 1.25; }
+.year { color: #9a9a9a; font-size: 0.85em; }
+.badges { display: flex; flex-wrap: wrap; gap: 6px; margin-top: auto; padding-top: 4px; }
+.badge { display: inline-flex; align-items: center; gap: 4px; font-size: 0.78em; }
+.score { font-weight: bold; padding: 2px 6px; border-radius: 4px; color: white; }
+.score-9x { background-color: #4CAF50; }
+.score-8x { background-color: #8BC34A; }
+.score-7x { background-color: #CDDC39; color: #333; }
+.score-6x { background-color: #FFEB3B; color: #333; }
+.score-5x { background-color: #FFC107; color: #333; }
+.score-0x { background-color: #F44336; }
+.score-unknown { background-color: #777; }
+#empty { display: none; text-align: center; color: #888; padding: 50px 0; font-size: 1.1em; }
+footer { text-align: center; margin-top: 30px; padding-top: 15px; border-top: 1px solid #383838; font-size: 0.85em; color: #777; }
+@media (max-width: 600px) { .grid { grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 10px; } header h1 { font-size: 1.6em; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+<header>
+<h1>Catalog</h1>
+<div class="counts">{{ total }} items &middot; {{ by_kind.game }} games &middot; {{ by_kind.movie }} movies &middot; {{ by_kind.series }} series</div>
+</header>
+
+<div class="toolbar">
+<input type="search" id="search" placeholder="Search by title…" autocomplete="off">
+<select id="type">
+<option value="all">All types</option>
+<option value="game">Games</option>
+<option value="movie">Movies</option>
+<option value="series">Series</option>
+</select>
+<select id="sort">
+<option value="title">Sort: Title</option>
+<option value="year">Sort: Year</option>
+<option value="rating">Sort: Rating</option>
+</select>
+</div>
+
+<div class="grid" id="grid">
+{% for e in entries %}
+<a class="card" href="{{ e.href }}" data-kind="{{ e.kind }}" data-title="{{ e.title | lower }}" data-year="{{ e.year or '' }}" data-score="{{ '%.3f' | format(e.sort_score) }}">
+<div class="thumb">
+{% if e.thumb %}<img src="{{ e.thumb }}" alt="" loading="lazy">{% else %}<div class="noimg">{% if e.kind == 'game' %}🎮{% elif e.kind == 'series' %}📺{% else %}🎬{% endif %}</div>{% endif %}
+<span class="kind kind-{{ e.kind }}">{{ e.kind }}</span>
+</div>
+<div class="meta">
+<div class="title">{{ e.title }}</div>
+{% if e.year %}<div class="year">{{ e.year }}</div>{% endif %}
+<div class="badges">
+{% if 'imdb' in e.ratings %}<span class="badge">IMDb <span class="score {{ e.ratings.imdb | score_color_class }}">{{ e.ratings.imdb }}</span></span>{% endif %}
+{% if 'rt_critics' in e.ratings %}<span class="badge">🍅 <span class="score {{ e.ratings.rt_critics | score_color_class(100) }}">{{ e.ratings.rt_critics }}%</span></span>{% endif %}
+{% if 'rt_audience' in e.ratings %}<span class="badge">🍿 <span class="score {{ e.ratings.rt_audience | score_color_class(100) }}">{{ e.ratings.rt_audience }}%</span></span>{% endif %}
+{% if 'metacritic' in e.ratings %}<span class="badge">MC <span class="score {{ e.ratings.metacritic | score_color_class(100) }}">{{ e.ratings.metacritic }}</span></span>{% endif %}
+</div>
+</div>
+</a>
+{% endfor %}
+</div>
+<div id="empty">No matching items.</div>
+
+<footer>Generated by {{ generator_name }} v{{ version }} on {{ generated_at }}</footer>
+</div>
+
+<script>
+(function() {
+  var search = document.getElementById("search");
+  var typeSel = document.getElementById("type");
+  var sortSel = document.getElementById("sort");
+  var grid = document.getElementById("grid");
+  var empty = document.getElementById("empty");
+  var cards = Array.prototype.slice.call(grid.children);
+
+  function sortVisible() {
+    var mode = sortSel.value;
+    var vis = cards.filter(function(c) { return c.style.display !== "none"; });
+    vis.sort(function(a, b) {
+      if (mode === "year") return (parseInt(b.dataset.year) || 0) - (parseInt(a.dataset.year) || 0);
+      if (mode === "rating") return (parseFloat(b.dataset.score) || 0) - (parseFloat(a.dataset.score) || 0);
+      return a.dataset.title.localeCompare(b.dataset.title);
+    });
+    vis.forEach(function(c) { grid.appendChild(c); });
+  }
+
+  function apply() {
+    var q = search.value.trim().toLowerCase();
+    var t = typeSel.value;
+    var visible = 0;
+    cards.forEach(function(c) {
+      var okType = (t === "all") || (c.dataset.kind === t);
+      var okText = !q || c.dataset.title.indexOf(q) !== -1;
+      var show = okType && okText;
+      c.style.display = show ? "" : "none";
+      if (show) visible++;
+    });
+    empty.style.display = visible ? "none" : "block";
+    sortVisible();
+  }
+
+  search.addEventListener("input", apply);
+  typeSel.addEventListener("change", apply);
+  sortSel.addEventListener("change", apply);
+})();
+</script>
+</body>
+</html>

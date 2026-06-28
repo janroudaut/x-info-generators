@@ -1,4 +1,6 @@
+import base64
 import hashlib
+import io
 import urllib.parse
 from pathlib import Path
 from typing import Callable, Optional
@@ -37,6 +39,34 @@ def optimize_and_encode(image_path: Path, max_width: int = 1280, quality: int = 
     """Optimize an image and return it as a base64 data URI."""
     optimized = optimize_image(image_path, max_width, quality)
     return encode_image_to_base64_data_uri(optimized)
+
+
+def downscale_data_uri(data_uri: Optional[str], max_px: int = 360, quality: int = 70) -> Optional[str]:
+    """Shrink an existing base64 data URI to a small WebP thumbnail.
+
+    Used to keep the catalog index lightweight: page posters are already inlined
+    at up to 1280px, far larger than a card thumbnail needs. Decodes the data URI,
+    fits it within ``max_px`` (longest side), re-encodes as WebP, and returns a new
+    data URI. Returns the input unchanged on any failure (incl. non-data URIs).
+    """
+    if not data_uri or not data_uri.startswith("data:"):
+        return data_uri
+    try:
+        header, b64 = data_uri.split(",", 1)
+        raw = base64.b64decode(b64)
+        with Image.open(io.BytesIO(raw)) as img:
+            # Animated images: keep as-is to avoid freezing a single frame.
+            if getattr(img, "n_frames", 1) > 1:
+                return data_uri
+            if img.mode in ("RGBA", "P"):
+                img = img.convert("RGB")
+            img.thumbnail((max_px, max_px), Image.LANCZOS)
+            buf = io.BytesIO()
+            img.save(buf, "WEBP", quality=quality)
+        encoded = base64.b64encode(buf.getvalue()).decode("ascii")
+        return f"data:image/webp;base64,{encoded}"
+    except Exception:
+        return data_uri
 
 
 _ALLOWED_EXTS = (".jpg", ".jpeg", ".png", ".gif", ".webp", ".avif")

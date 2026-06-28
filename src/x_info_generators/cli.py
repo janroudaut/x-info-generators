@@ -49,6 +49,18 @@ def add_common_arguments(parser: argparse.ArgumentParser):
         "--purge-cache", action="store_true", dest="purge_cache",
         help="Delete cache entries older than --cache-ttl days, then exit.")
     parser.add_argument(
+        "--index", nargs="?", const="catalog.html", default=None, metavar="OUTPUT",
+        help="Build a browsable catalog of already-generated pages found under the "
+             "given paths, then exit (no generation, no network). Writes OUTPUT "
+             "(default: catalog.html).")
+    parser.add_argument(
+        "--max-depth", type=int, default=5, metavar="N",
+        help="Max directory depth scanned by --index (default: 5).")
+    parser.add_argument(
+        "--wsl", action="store_true",
+        help="For --index: emit Windows file:// links (e.g. D:/…) for /mnt/<drive>/ "
+             "paths, so a catalog built under WSL opens correctly in a Windows browser.")
+    parser.add_argument(
         "--cache-ttl", type=int, default=30,
         help="Age (days) used by --purge-cache; 0 purges everything (default: 30). "
              "The cache itself never expires on its own.")
@@ -57,4 +69,4 @@ def add_common_arguments(parser: argparse.ArgumentParser):
 def setup_environment(args, script_name: str):
     D.setup("NO_COLOR" in os.environ or args.no_color)
     wikipedia.set_user_agent(WIKIPEDIA_USER_AGENT)
-    print(f"{D.ROCKET} {script_name} v{__version__} {D.ROCKET}")
+    print(f"{D.ROCKET} {script_name}")

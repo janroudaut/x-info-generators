@@ -117,11 +117,35 @@ video-info-gen -R --offline --force /path/to/videos/   # re-render from cache, n
 video-info-gen --purge-cache --cache-ttl 0             # wipe the cache
 ```
 
+## Catalog
+
+`--index` builds a single, browsable **catalog page** from the pages **already generated**
+on disk — no generation, no network. It scans the given paths for generated `.html`, reads
+each one's structure (title, type, year, ratings, poster) and writes a self-contained
+`index.html` with client-side **search, type filter and sort** (title / year / rating).
+
+Because the type of each entry is read from the page itself (not from which command produced
+it), one invocation can build a **unified catalog of games, movies and series** by listing
+several roots:
+
+```bash
+# catalog of a video library
+video-info-gen --index catalog.html /path/to/videos/
+
+# unified catalog: games + movies + series in one file
+video-info-gen --index catalog.html /path/to/videos/ /path/to/games/
+```
+
+Posters are downscaled and inlined, so the catalog is one portable file. Season pages are
+left out (only the main game/movie/series pages are listed). `game-info-gen --index …`
+behaves identically — the scan is generator-agnostic.
+
 ## Common options
 
 | Flag | Description |
 |------|-------------|
 | `-R, --recursive` | Scan subdirectories |
+| `--index [OUTPUT]` | Build a catalog of already-generated pages under the given paths, then exit (default: `catalog.html`) |
 | `--force` | Regenerate even if `.html` already exists |
 | `-C, --cleanup` | Remove generated `.html` files (incl. series + season pages) |
 | `--no-color` | Disable emoji and color output |

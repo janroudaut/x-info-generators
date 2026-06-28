@@ -9,6 +9,7 @@ from ..cli import add_common_arguments, setup_environment
 from ..cache import FetchCache, default_cache_root, purge_cache
 from ..http import create_session
 from ..processing import RunStats, print_run_summary, cleanup_html_files
+from ..index import build_catalog
 from ..utils import format_bytes
 from .. import __version__
 from .processing import clean_game_title, process_game_directory, DEFAULT_HTML_FILENAME
@@ -17,11 +18,24 @@ USER_AGENT = "GameInfoGenerator/1.0.0 (I'm a kind scraper, called manually and u
 
 
 async def _main_loop(args: argparse.Namespace):
-    setup_environment(args, "Game Info Generator")
+    setup_environment(
+        args,
+        "Creating catalog from HTML files..." if args.index is not None else "Game Info Generator",
+    )
 
     if args.purge_cache:
         removed, freed = purge_cache(default_cache_root(), args.cache_ttl)
         print(f"{D.CLEAN} Cleaned {removed} cache entr{'y' if removed == 1 else 'ies'}, freed {format_bytes(freed)}")
+        return
+
+    if args.index is not None:
+        if not args.input_dirs:
+            print(f"{D.ERROR} --index needs at least one path to scan.")
+            return
+        total, by_kind = build_catalog(args.input_dirs, Path(args.index), print, args.max_depth, args.wsl)
+        print(f"{D.SUCCESS_HTML} Catalog: {total} item(s) "
+              f"({by_kind['game']} games, {by_kind['movie']} movies, {by_kind['series']} series) "
+              f"→ {args.index}")
         return
 
     if not args.input_dirs:

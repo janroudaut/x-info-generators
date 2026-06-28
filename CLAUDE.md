@@ -43,6 +43,7 @@ The package exposes two independent entry points (`game-info-gen`, `video-info-g
 | `cli.py` | `add_common_arguments()` shared by both CLIs; `setup_environment()` configures `DisplayMode` |
 | `utils.py` | `format_bytes()`, `encode_image_to_base64_data_uri()`, `run_in_executor()` |
 | `templates.py` | `render_template()` with `score_color_class` Jinja2 filter |
+| `index.py` | `--index` catalog: scans already-generated pages (`parse_page` reads `<title>` suffix, `img.header-image`, `.ratings`, `.details-table`), renders `index.html.j2` via `build_catalog()`. Couples to the content templates' structure. |
 
 ### Key implementation details
 
