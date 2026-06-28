@@ -169,3 +169,7 @@ src/x_info_generators/
     ├── fetchers.py      # Wikidata, imdbapi.dev, TVmaze, Rotten Tomatoes, Wikipedia, YouTube, FFmpeg
     └── processing.py    # process_movie_file, process_series
 ```
+
+## License
+
+[WTFPL](LICENSE) — Do What The Fuck You Want To Public License.

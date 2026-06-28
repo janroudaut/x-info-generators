@@ -6,6 +6,8 @@ build-backend = "hatchling.build"
 name = "x-info-generators"
 version = "1.0.0"
 description = "Generate self-contained HTML info pages for games, movies and TV series"
+license = "WTFPL"
+license-files = ["LICENSE"]
 requires-python = ">=3.11"
 dependencies = [
     "aiohttp",
