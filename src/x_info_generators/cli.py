@@ -4,13 +4,11 @@ import os
 import wikipedia
 
 from .display import DisplayMode as D
-from . import __version__
+from . import __version__, REPO_URL
 
 # Wikimedia rejects the wikipedia lib's default User-Agent with HTTP 403.
 # A descriptive UA with contact info is required by their robot policy.
-WIKIPEDIA_USER_AGENT = (
-    f"x-info-generators/{__version__} (+https://github.com/janroudaut/x-info-generators)"
-)
+WIKIPEDIA_USER_AGENT = f"x-info-generators/{__version__} (+{REPO_URL})"
 
 
 def add_common_arguments(parser: argparse.ArgumentParser):

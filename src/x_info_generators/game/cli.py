@@ -11,10 +11,10 @@ from ..http import create_session
 from ..processing import RunStats, print_run_summary, cleanup_html_files
 from ..index import build_catalog
 from ..utils import format_bytes
-from .. import __version__
+from .. import __version__, REPO_URL
 from .processing import clean_game_title, process_game_directory, DEFAULT_HTML_FILENAME
 
-USER_AGENT = "GameInfoGenerator/1.0.0 (I'm a kind scraper, called manually and used for personal use <3)"
+USER_AGENT = f"GameInfoGenerator/{__version__} (I'm a kind scraper, called manually and used for personal use <3; +{REPO_URL})"
 
 
 async def _main_loop(args: argparse.Namespace):

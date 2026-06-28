@@ -11,14 +11,14 @@ from ..http import create_session
 from ..processing import RunStats, print_run_summary
 from ..index import build_catalog
 from ..utils import format_bytes, path_matches_ignore
-from .. import __version__
+from .. import __version__, REPO_URL
 from .processing import (
     find_movie_files, process_movie_file, process_series,
     VIDEO_EXTENSIONS,
 )
 from .discovery import classify_items
 
-USER_AGENT = "VideoInfoGenerator/1.0.0 (Personal, manual use script)"
+USER_AGENT = f"VideoInfoGenerator/{__version__} (Personal, manual use script; +{REPO_URL})"
 
 
 def _collect_video_files(paths, recursive, ignore=None):

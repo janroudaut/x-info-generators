@@ -9,8 +9,9 @@ import wikipedia
 from bs4 import BeautifulSoup
 
 from ..display import DisplayMode as D
+from .. import __version__, REPO_URL
 
-USER_AGENT = "GameInfoGenerator/1.0.0 (I'm a kind scraper, called manually and used for personal use <3)"
+USER_AGENT = f"GameInfoGenerator/{__version__} (I'm a kind scraper, called manually and used for personal use <3; +{REPO_URL})"
 
 
 async def fetch_steam_data(session: aiohttp.ClientSession, game_title: str, log) -> Optional[Dict[str, Any]]:
