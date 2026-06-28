@@ -10,7 +10,7 @@ uv run game-info-gen /path/to/game
 uv run video-info-gen /path/to/movie.mkv
 
 # Build a browsable catalog from already-generated pages (no network, no generation)
-uv run video-info-gen --index 00_INDEX.html /path/to/videos/
+uv run video-info-gen --index /path/to/videos/
 
 # Install globally as user commands (production, after any change)
 uv tool install --force --reinstall .

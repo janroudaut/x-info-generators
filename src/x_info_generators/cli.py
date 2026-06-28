@@ -1,10 +1,25 @@
 import argparse
 import os
+from pathlib import Path
 
 import wikipedia
 
 from .display import DisplayMode as D
 from . import __version__, REPO_URL
+
+DEFAULT_INDEX_OUTPUT = "00_INDEX.html"
+
+
+def resolve_index_target(index_value, paths):
+    """Disambiguate the optional ``--index [OUTPUT]`` value.
+
+    If the value is an existing directory it's meant as a path to scan (so
+    ``--index .`` works); otherwise it's the output file. Returns
+    ``(output_path, scan_paths)``.
+    """
+    if index_value and Path(index_value).is_dir():
+        return DEFAULT_INDEX_OUTPUT, [index_value, *paths]
+    return (index_value or DEFAULT_INDEX_OUTPUT), paths
 
 # Wikimedia rejects the wikipedia lib's default User-Agent with HTTP 403.
 # A descriptive UA with contact info is required by their robot policy.
@@ -49,8 +64,9 @@ def add_common_arguments(parser: argparse.ArgumentParser):
     parser.add_argument(
         "--index", nargs="?", const="00_INDEX.html", default=None, metavar="OUTPUT",
         help="Build a browsable catalog of already-generated pages found under the "
-             "given paths, then exit (no generation, no network). Writes OUTPUT "
-             "(default: 00_INDEX.html).")
+             "given paths, then exit (no generation, no network). An optional value "
+             "is the output file — but a directory there is treated as a path to scan "
+             "(default output: 00_INDEX.html).")
     parser.add_argument(
         "--max-depth", type=int, default=5, metavar="N",
         help="Max directory depth scanned by --index (default: 5).")

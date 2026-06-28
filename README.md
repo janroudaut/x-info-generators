@@ -84,18 +84,21 @@ A full game page — description, details, Metacritic + Steam reviews, links and
 </p>
 
 ```bash
-# a videos catalog (writes 00_INDEX.html)
-video-info-gen --index 00_INDEX.html /path/to/videos/
+# a videos catalog (scan the dir, write ./00_INDEX.html)
+video-info-gen --index /path/to/videos/
 
 # a games catalog
-game-info-gen --index 00_INDEX.html /path/to/games/
+game-info-gen --index /path/to/games/
+
+# choose the output file
+video-info-gen --index my-catalog.html /path/to/videos/
 ```
 
 A single-type catalog drops the type filter and names itself after that type (e.g. **Games**). The type is read from each page — so you *can* point one run at several roots for a combined catalog, but per-category is the usual case. Posters/headers are downscaled and inlined (one portable file); season pages are left out.
 
 | Flag | Description |
 |------|-------------|
-| `--index [OUTPUT]` | Build the catalog under the given paths, then exit (default: `00_INDEX.html`) |
+| `--index [OUTPUT]` | Build the catalog under the given paths, then exit. An optional value is the output file; a directory there is treated as a path to scan (default output: `00_INDEX.html`) |
 | `--title TEXT` | Catalog page title (default: derived — the single type if there's only one, else "Catalog") |
 | `--max-depth N` | Max directory depth scanned by `--index` (default: 5) |
 | `--wsl` | Emit Windows `file://` links (e.g. `D:/…`) for `/mnt/<drive>/` paths, so a catalog built under WSL opens correctly in a Windows browser |

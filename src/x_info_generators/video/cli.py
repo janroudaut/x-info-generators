@@ -5,7 +5,7 @@ import time
 from pathlib import Path
 
 from ..display import DisplayMode as D
-from ..cli import add_common_arguments, setup_environment
+from ..cli import add_common_arguments, setup_environment, resolve_index_target
 from ..cache import FetchCache, default_cache_root, purge_cache
 from ..http import create_session
 from ..processing import RunStats, print_run_summary
@@ -77,13 +77,14 @@ async def _main_loop(args: argparse.Namespace):
         return
 
     if args.index is not None:
-        if not args.paths:
+        output, scan = resolve_index_target(args.index, args.paths)
+        if not scan:
             print(f"{D.ERROR} --index needs at least one path to scan.")
             return
-        total, by_kind = build_catalog(args.paths, Path(args.index), print, args.max_depth, args.wsl, args.title)
+        total, by_kind = build_catalog(scan, Path(output), print, args.max_depth, args.wsl, args.title)
         print(f"{D.SUCCESS_HTML} Catalog: {total} item(s) "
               f"({by_kind['game']} games, {by_kind['movie']} movies, {by_kind['series']} series) "
-              f"→ {args.index}")
+              f"→ {output}")
         return
 
     if not args.paths:
