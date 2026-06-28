@@ -80,7 +80,7 @@ async def _main_loop(args: argparse.Namespace):
         if not args.paths:
             print(f"{D.ERROR} --index needs at least one path to scan.")
             return
-        total, by_kind = build_catalog(args.paths, Path(args.index), print, args.max_depth, args.wsl)
+        total, by_kind = build_catalog(args.paths, Path(args.index), print, args.max_depth, args.wsl, args.title)
         print(f"{D.SUCCESS_HTML} Catalog: {total} item(s) "
               f"({by_kind['game']} games, {by_kind['movie']} movies, {by_kind['series']} series) "
               f"→ {args.index}")

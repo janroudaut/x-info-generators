@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Catalog ({{ total }})</title>
+<title>{{ title }} ({{ total }})</title>
 <style>
 *, *::before, *::after { box-sizing: border-box; }
 body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 0; background-color: #1e1e1e; color: #d4d4d4; line-height: 1.5; }
@@ -46,18 +46,20 @@ footer { text-align: center; margin-top: 30px; padding-top: 15px; border-top: 1p
 <body>
 <div class="wrap">
 <header>
-<h1>Catalog</h1>
-<div class="counts">{{ total }} items &middot; {{ by_kind.game }} games &middot; {{ by_kind.movie }} movies &middot; {{ by_kind.series }} series</div>
+<h1>{{ title }}</h1>
+<div class="counts">{{ total }} items{% if by_kind.game %} &middot; {{ by_kind.game }} games{% endif %}{% if by_kind.movie %} &middot; {{ by_kind.movie }} movies{% endif %}{% if by_kind.series %} &middot; {{ by_kind.series }} series{% endif %}</div>
 </header>
 
 <div class="toolbar">
 <input type="search" id="search" placeholder="Search by title…" autocomplete="off">
+{% if show_type_filter %}
 <select id="type">
 <option value="all">All types</option>
 <option value="game">Games</option>
 <option value="movie">Movies</option>
 <option value="series">Series</option>
 </select>
+{% endif %}
 <select id="sort">
 <option value="title">Sort: Title</option>
 <option value="year">Sort: Year</option>
@@ -112,7 +114,7 @@ footer { text-align: center; margin-top: 30px; padding-top: 15px; border-top: 1p
 
   function apply() {
     var q = search.value.trim().toLowerCase();
-    var t = typeSel.value;
+    var t = typeSel ? typeSel.value : "all";
     var visible = 0;
     cards.forEach(function(c) {
       var okType = (t === "all") || (c.dataset.kind === t);
@@ -126,7 +128,7 @@ footer { text-align: center; margin-top: 30px; padding-top: 15px; border-top: 1p
   }
 
   search.addEventListener("input", apply);
-  typeSel.addEventListener("change", apply);
+  if (typeSel) typeSel.addEventListener("change", apply);
   sortSel.addEventListener("change", apply);
 })();
 </script>

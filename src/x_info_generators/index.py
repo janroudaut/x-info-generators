@@ -221,8 +221,11 @@ def _iter_html(roots, output_path: Path, max_depth: int = 5):
                 yield f
 
 
+_KIND_TITLE = {"game": "Games", "movie": "Movies", "series": "Series"}
+
+
 def build_catalog(roots, output_path, log: Callable, max_depth: int = 5,
-                  wsl: bool = False) -> Tuple[int, Dict[str, int]]:
+                  wsl: bool = False, title: str | None = None) -> Tuple[int, Dict[str, int]]:
     """Scan ``roots`` for generated pages and write a self-contained ``index.html``.
 
     Pages are found and parsed in a single stream (no upfront full-tree scan).
@@ -260,11 +263,19 @@ def build_catalog(roots, output_path, log: Callable, max_depth: int = 5,
     entries.sort(key=lambda e: e["title"].lower())
     log(f"{D.PROCESS} Rendering catalog → {output_path}")
 
+    # With a single kind present, default the title to that kind and drop the type
+    # filter (nothing to filter). Otherwise fall back to a generic "Catalog".
+    present_kinds = [k for k in ("game", "movie", "series") if by_kind[k]]
+    if title is None:
+        title = _KIND_TITLE[present_kinds[0]] if len(present_kinds) == 1 else "Catalog"
+
     html = render_template(
         "index.html.j2",
         entries=entries,
         by_kind=by_kind,
         total=len(entries),
+        title=title,
+        show_type_filter=len(present_kinds) > 1,
         generator_name="CatalogIndexGenerator",
         version=__version__,
         generated_at=time.strftime("%Y-%m-%d %H:%M:%S"),

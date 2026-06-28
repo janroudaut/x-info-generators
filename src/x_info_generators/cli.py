@@ -61,6 +61,10 @@ def add_common_arguments(parser: argparse.ArgumentParser):
         help="For --index: emit Windows file:// links (e.g. D:/…) for /mnt/<drive>/ "
              "paths, so a catalog built under WSL opens correctly in a Windows browser.")
     parser.add_argument(
+        "--title", default=None, metavar="TEXT",
+        help="For --index: catalog page title (default: derived from contents — the "
+             "single type if there's only one, else \"Catalog\").")
+    parser.add_argument(
         "--cache-ttl", type=int, default=30,
         help="Age (days) used by --purge-cache; 0 purges everything (default: 30). "
              "The cache itself never expires on its own.")
