@@ -31,3 +31,6 @@ env/
 # OS
 .DS_Store
 Thumbs.db
+
+# Original reference scripts (kept locally, not versioned)
+orig/
