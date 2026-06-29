@@ -3,6 +3,15 @@
 All notable changes to this project are documented here.
 This project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.2.1] — 2026-06-29
+
+### Changed
+- **`--help` reorganized** — options grouped by topic (generation, catalog,
+  caching, display, network) with aligned descriptions and uppercase section
+  headings (GNU/eza-style formatter). A bare invocation now prints full help.
+- Invocation errors print a short usage line plus a highlighted message on
+  stderr and exit with status 2; clean exit codes throughout (130 on Ctrl-C).
+
 ## [1.2.0] — 2026-06-29
 
 ### Changed

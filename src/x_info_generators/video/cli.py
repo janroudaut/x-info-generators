@@ -1,11 +1,15 @@
 import argparse
 import asyncio
 import shutil
+import sys
 import time
 from pathlib import Path
 
 from ..display import DisplayMode as D
-from ..cli import add_common_arguments, setup_environment, resolve_index_target
+from ..cli import (
+    add_common_arguments, setup_environment, resolve_index_target,
+    InfoArgumentParser, validate_invocation,
+)
 from ..cache import FetchCache, default_cache_root, purge_cache
 from ..http import create_session
 from ..processing import RunStats, print_run_summary
@@ -78,17 +82,10 @@ async def _main_loop(args: argparse.Namespace):
 
     if args.index is not None:
         output, scan = resolve_index_target(args.index, args.paths)
-        if not scan:
-            print(f"{D.ERROR} --index needs at least one path to scan.")
-            return
         total, by_kind = build_catalog(scan, Path(output), print, args.max_depth, args.wsl, args.title)
         print(f"{D.SUCCESS_HTML} Catalog: {total} item(s) "
               f"({by_kind['game']} games, {by_kind['movie']} movies, {by_kind['series']} series) "
               f"→ {output}")
-        return
-
-    if not args.paths:
-        print(f"{D.ERROR} No paths given.")
         return
 
     if not shutil.which("ffmpeg"):
@@ -97,8 +94,8 @@ async def _main_loop(args: argparse.Namespace):
     # Collect candidate video files, then classify them into items (movies + series)
     video_files = _collect_video_files(args.paths, args.recursive, args.ignore)
     if not video_files:
-        print(f"{D.SHRUG} No video files found to process.")
-        return
+        print(f"{D.SHRUG} No video files found to process.", file=sys.stderr)
+        return 1
 
     # Cleanup mode
     if args.cleanup:
@@ -157,23 +154,29 @@ async def _main_loop(args: argparse.Namespace):
 
 
 def main():
-    parser = argparse.ArgumentParser(
+    parser = InfoArgumentParser(
         description="Generate HTML descriptions for local movie files and TV series.",
-        formatter_class=argparse.RawTextHelpFormatter,
     )
     parser.add_argument(
         "paths", nargs="*", metavar="PATH",
         help="One or more paths to movie files or directories.",
     )
-    add_common_arguments(parser)
-    parser.add_argument(
+    groups = add_common_arguments(parser)
+    groups["generation"].add_argument(
         "--ignore", action="append", metavar="PATTERN", dest="ignore",
         help="Exclude paths matching PATTERN (glob-like, case-insensitive; "
              "wrap in /.../ for a regex). Repeatable.")
 
+    # Bare invocation: show the full help and exit cleanly (onboarding).
+    if len(sys.argv) == 1:
+        parser.print_help()
+        return
+
     args = parser.parse_args()
+    validate_invocation(parser, args, args.paths)
 
     try:
-        asyncio.run(_main_loop(args))
+        sys.exit(asyncio.run(_main_loop(args)))
     except KeyboardInterrupt:
-        print("\nProcess interrupted by user. Exiting.")
+        print("\nProcess interrupted by user. Exiting.", file=sys.stderr)
+        sys.exit(130)
