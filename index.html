@@ -89,6 +89,9 @@
     line-height: 1.6;
   }
   .install .c { color: #6a9955; }
+  .install .more { margin: 14px 0 0; text-transform: none; letter-spacing: normal; font-size: 0.85rem; }
+  .install .more a { color: var(--accent); text-decoration: none; }
+  .install .more a:hover { text-decoration: underline; }
   footer { text-align: center; color: var(--muted); font-size: 0.9rem; }
   footer a { color: var(--accent); text-decoration: none; }
   footer a:hover { text-decoration: underline; }
@@ -126,8 +129,12 @@ uv tool install x-info-generators
 gen-game-info /path/to/game
 gen-video-info /path/to/movie.mkv
 
-<span class="c"># build a browsable catalog like the ones above</span>
+<span class="c"># generate pages across a whole library (-R = recurse)</span>
+gen-video-info -R /path/to/library/
+
+<span class="c"># build a catalog from the pages already generated above</span>
 gen-video-info --index catalog.html /path/to/library/</code>
+    <p class="more">Full options &amp; docs on <a href="https://github.com/janroudaut/x-info-generators">GitHub</a></p>
   </div>
 
   <footer>
