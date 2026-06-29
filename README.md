@@ -10,6 +10,10 @@ Turn your local **games**, **movies** and **TV series** into self-contained HTML
   <img src="assets/screenshots/catalog-videos.png" width="900" alt="A searchable catalog of movies and TV series">
 </p>
 
+<p align="center">
+  <b>🌐 <a href="https://janroudaut.github.io/x-info-generators/">Live demo</a></b> — browse sample game &amp; video catalogs in your browser.
+</p>
+
 Every generated page is a **single portable `.html` file** — zero external dependencies, no CDN, no JS/CSS imports. Images are optimized (WebP via Pillow) and embedded as base64 data URIs. Fetched data is cached on disk, so re-runs are near-instant and can run fully **offline**.
 
 ## Install
