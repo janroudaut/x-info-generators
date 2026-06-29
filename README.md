@@ -62,6 +62,25 @@ Each season that lives in its own folder also gets a page listing every episode 
 </p>
 </details>
 
+### How screenshots are acquired
+
+By default (`--screenshot-source auto`), stills are fetched **online** from
+imdbapi.dev (`/titles/{id}/images` — landscape *still frames*), so a page has real
+screenshots **even when generated from a name alone**, with no local file and no
+FFmpeg. When a title has no online stills, it **falls back to FFmpeg**, which
+extracts evenly-spaced frames from the local video (the first owned episode for a
+series). Either way the results are cached, so re-runs do no extra work.
+
+| `--screenshot-source` | Behaviour |
+|-----------------------|-----------|
+| `auto` *(default)* | Online stills, then FFmpeg fallback for titles that have none |
+| `online` | Online stills only — no FFmpeg (titles without stills get none) |
+| `ffmpeg` | Always extract frames from the local file (ignores online stills) |
+| `off` | No screenshots at all |
+
+`--max-screenshots N` caps how many are kept (default 8). FFmpeg is therefore
+**only** needed for the fallback — see [Supported video formats](#supported-video-formats).
+
 ## 🎮 gen-game-info
 
 Generates a `00_GAME_INFO.html` in each game directory, aggregating Steam, Metacritic, Wikipedia, MobyGames and Steam user reviews.
@@ -150,12 +169,11 @@ gen-video-info --purge-cache --cache-ttl 0             # wipe the cache
 
 Common ones: `.mp4`, `.mkv`, `.avi`, `.mov`, `.webm`, `.ts`, `.mpg`, `.m4v`, `.wmv`, `.flv` — plus a broad set of other containers (`.m2ts`, `.mpeg`, `.vob`, `.3gp`, `.divx`, `.rmvb`, `.mxf`, …). In practice anything **FFmpeg** can read is fine.
 
-By default stills are pulled **online** from imdbapi.dev (so a page has real
-screenshots even when generated from a name alone, with no local file), and
-[FFmpeg](https://ffmpeg.org/) is the **fallback** that extracts frames from the
-local video when no online stills exist. FFmpeg is therefore **optional** —
-without it in `PATH`, titles lacking online stills simply get no screenshots
-(everything else is still fetched). Control the source with `--screenshot-source`.
+[FFmpeg](https://ffmpeg.org/) is **optional** — stills come from imdbapi.dev by
+default, and FFmpeg is only the local fallback (see
+[How screenshots are acquired](#how-screenshots-are-acquired)). Without it in
+`PATH`, titles lacking online stills simply get no screenshots; everything else
+is still fetched.
 
 ## Data sources
 
