@@ -78,7 +78,7 @@ footer { text-align: center; margin-top: 30px; padding-top: 15px; border-top: 1p
 </div>
 <div class="meta">
 <div class="title">{{ e.title }}</div>
-{% if e.year %}<div class="year">{{ e.year }}</div>{% endif %}
+{% if e.year or e.runtime %}<div class="year">{{ e.year }}{% if e.year and e.runtime %} &middot; {% endif %}{{ e.runtime }}</div>{% endif %}
 <div class="badges">
 {% if 'imdb' in e.ratings %}<span class="badge">IMDb <span class="score {{ e.ratings.imdb | score_color_class }}">{{ e.ratings.imdb }}</span></span>{% endif %}
 {% if 'rt_critics' in e.ratings %}<span class="badge">🍅 <span class="score {{ e.ratings.rt_critics | score_color_class(100) }}">{{ e.ratings.rt_critics }}%</span></span>{% endif %}

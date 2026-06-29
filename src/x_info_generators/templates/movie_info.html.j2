@@ -75,6 +75,7 @@ a.trailer-link:hover { color: #ffc1c1; }
 {% endif %}
 {% if data.genres %}<tr><th>Genres</th><td>{{ data.genres | join(", ") }}</td></tr>{% endif %}
 {% if data.year %}<tr><th>Year</th><td>{{ data.year }}</td></tr>{% endif %}
+{% if data.runtime_seconds %}<tr><th>Runtime</th><td>{{ data.runtime_seconds | format_duration }}</td></tr>{% endif %}
 {% if data.cast %}<tr><td colspan="2">{{ m.cast_list(data.cast) }}</td></tr>{% endif %}
 </table>
 {% endif %}

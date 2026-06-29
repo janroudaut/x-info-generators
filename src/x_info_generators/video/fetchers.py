@@ -120,6 +120,7 @@ async def fetch_imdb_detail(session: aiohttp.ClientSession, imdb_id: str, log) -
             "directors": _imdb_persons(detail.get("directors", [])),
             "cast": cast,
             "genres": detail.get("genres", []),
+            "runtime_seconds": detail.get("runtimeSeconds"),
             "imdb_id": detail.get("id"),
         }
         log(f"    {D.SUCCESS_DATA} IMDb: Found '{result['title']}' ({result['year']})")
@@ -327,6 +328,7 @@ async def fetch_tvmaze_series(session: aiohttp.ClientSession, title: str, log) -
             "poster_url": (d.get("image") or {}).get("original"),
             "genres": d.get("genres", []),
             "network": network.get("name"),
+            "episode_runtime": d.get("averageRuntime") or d.get("runtime"),
             "cast": cast,
             "imdb_id": (d.get("externals") or {}).get("imdb"),
             "episodes_by_season": episodes_by_season,

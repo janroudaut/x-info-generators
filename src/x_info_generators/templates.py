@@ -13,7 +13,20 @@ def _get_env():
     )
     env.filters["score_color_class"] = score_color_class
     env.filters["linebreaks"] = linebreaks
+    env.filters["format_duration"] = format_duration
     return env
+
+
+def format_duration(seconds):
+    """Seconds -> '1h 21min' / '45min' / '2h'. Empty string if falsy."""
+    if not seconds:
+        return ""
+    h, m = divmod(int(seconds) // 60, 60)
+    if h and m:
+        return f"{h}h {m:02d}min"
+    if h:
+        return f"{h}h"
+    return f"{m}min"
 
 
 def linebreaks(value) -> Markup:

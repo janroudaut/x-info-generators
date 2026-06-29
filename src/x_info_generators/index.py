@@ -123,10 +123,15 @@ def parse_page(html_path: Path) -> Optional[Dict]:
     if year and title:
         title = re.sub(r"\s*\(" + re.escape(year) + r"\)\s*$", "", title).strip()
 
+    rows = _details_rows(soup)
     genres = []
-    grow = _details_rows(soup).get("genres")
+    grow = rows.get("genres")
     if grow:
         genres = [g.strip() for g in grow.split(",") if g.strip()]
+
+    # Movies expose "Runtime" (e.g. "1h 21min"); series expose "Episode length"
+    # (e.g. "~30 min"). The value is already display-formatted by the templates.
+    runtime = rows.get("runtime") or rows.get("episode length")
 
     thumb = None
     img = soup.select_one("img.header-image")
@@ -137,6 +142,7 @@ def parse_page(html_path: Path) -> Optional[Dict]:
         "kind": kind,
         "title": title,
         "year": year,
+        "runtime": runtime,
         "ratings": _parse_ratings(soup, kind),
         "genres": genres,
         "thumb": thumb,

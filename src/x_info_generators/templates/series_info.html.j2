@@ -47,6 +47,7 @@ a.trailer-link:hover { color: #ffc1c1; }
 {% if data.genres %}<tr><th>Genres</th><td>{{ data.genres | join(", ") }}</td></tr>{% endif %}
 {% if data.year %}<tr><th>Years</th><td>{{ data.year }}{% if data.end_year %}&ndash;{{ data.end_year }}{% endif %}</td></tr>{% endif %}
 {% if data.total_seasons %}<tr><th>Seasons</th><td>{{ data.total_seasons }}</td></tr>{% endif %}
+{% if data.episode_runtime %}<tr><th>Episode length</th><td>~{{ data.episode_runtime }} min</td></tr>{% endif %}
 {% if data.cast %}<tr><td colspan="2">{{ m.cast_list(data.cast) }}</td></tr>{% endif %}
 </table>
 

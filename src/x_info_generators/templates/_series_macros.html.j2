@@ -38,7 +38,7 @@
 {% for a in cast %}
 <div class="cast-member">
 {% if a.image_src %}<img class="cast-photo" src="{{ a.image_src }}" alt="{{ a.name }}" loading="lazy">{% else %}<div class="cast-photo cast-photo-empty"></div>{% endif %}
-<div class="cast-info">{% if a.url %}<a href="{{ a.url }}" target="_blank" rel="noopener noreferrer">{{ a.name }}</a>{% else %}<span>{{ a.name }}</span>{% endif %}{% if a.character %}<span class="cast-char">{{ a.character }}</span>{% endif %}</div>
+<div class="cast-info">{% if a.url %}<a href="{{ a.url }}" target="_blank" rel="noopener noreferrer">{{ a.name }}</a>{% else %}<span>{{ a.name }}</span>{% endif %}{% if a.character %}<span class="cast-char" title="{{ a.character }}">{{ a.character }}</span>{% endif %}</div>
 </div>
 {% endfor %}
 </div>
