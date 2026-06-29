@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Chessmaster 9000 - Game Info</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; }
+body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 0; background-color: #1e1e1e; color: #d4d4d4; line-height: 1.6; overflow-wrap: break-word; word-wrap: break-word; }
+.container { max-width: 1400px; margin: 0 auto 20px; padding: 25px; border-radius: 8px; }
+header { text-align: center; margin-bottom: 20px; }
+header h1 { color: #569cd6; font-size: 2.8em; margin: 0; border-bottom: 2px solid #444; padding-bottom: 10px; }
+h2 { color: #9cf; margin-top: 25px; border-bottom: 1px solid #444; padding-bottom: 8px; font-size: 1.8em; }
+section > h2:first-child { margin-top: 0; }
+img { max-width: 100%; height: auto; }
+.description-content img, .description-content video { display: block; max-width: 100% !important; width: auto !important; height: auto !important; border-radius: 4px; margin: 10px 0; }
+.media-wrapper { position: relative; display: inline-block; max-width: 100%; }
+.description-content .media-wrapper { display: block; }
+.media-wrapper img, .media-wrapper video, .media-wrapper canvas { display: block; max-width: 100% !important; height: auto !important; }
+.media-wrapper canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
+.media-toggle { position: absolute; top: 8px; right: 8px; background: rgba(0,0,0,0.7); color: white; border: 2px solid rgba(255,255,255,0.3); border-radius: 50%; width: 36px; height: 36px; font-size: 16px; cursor: pointer; opacity: 0.7; z-index: 2; display: flex; align-items: center; justify-content: center; transition: opacity 0.2s; }
+.media-toggle:hover { opacity: 1; background: rgba(0,0,0,0.9); }
+.lightbox-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.92); z-index: 1000; justify-content: center; align-items: center; cursor: zoom-out; }
+.lightbox-overlay.active { display: flex; }
+.lightbox-overlay img { max-width: 95vw; max-height: 95vh; object-fit: contain; border-radius: 4px; cursor: default; }
+.lightbox-close { position: absolute; top: 15px; right: 25px; color: #fff; font-size: 36px; cursor: pointer; z-index: 1001; line-height: 1; opacity: 0.8; }
+.lightbox-close:hover { opacity: 1; }
+.lightbox-nav { position: absolute; top: 50%; transform: translateY(-50%); color: #fff; font-size: 48px; cursor: pointer; opacity: 0.7; user-select: none; padding: 20px; z-index: 1001; }
+.lightbox-nav:hover { opacity: 1; }
+.lightbox-prev { left: 10px; }
+.lightbox-next { right: 10px; }
+[data-lightbox] { cursor: zoom-in; }
+.screenshots-container { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 15px; margin-top: 15px; }
+.screenshots-container img { width: 100%; border-radius: 4px; border: 2px solid #444; transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out; }
+.screenshots-container img:hover { transform: scale(1.03); box-shadow: 0 0 10px rgba(86,156,214,0.7); }
+.score { font-weight: bold; padding: 5px 10px; border-radius: 5px; color: white; display: inline-block; min-width: 30px; text-align: center; }
+.score a { color: white; text-decoration: none; }
+.score-9x { background-color: #4CAF50; }
+.score-8x { background-color: #8BC34A; }
+.score-7x { background-color: #CDDC39; color: #333; }
+.score-6x { background-color: #FFEB3B; color: #333; }
+.score-5x { background-color: #FFC107; color: #333; }
+.score-0x { background-color: #F44336; }
+.score-unknown { background-color: #777; }
+ul { list-style-type: none; padding-left: 0; }
+li { margin-bottom: 8px; }
+a { color: #6cb6ff; text-decoration: none; }
+a:hover { text-decoration: underline; color: #a8d4ff; }
+.details-table { width: 100%; border-collapse: collapse; margin-top: 10px; background-color: #383838; border-radius: 5px; overflow: hidden; }
+.details-table th, .details-table td { padding: 10px 15px; text-align: left; border-bottom: 1px solid #4a4a4a; }
+.details-table th { font-weight: bold; color: #9cdcfe; }
+.details-table tr:last-child th, .details-table tr:last-child td { border-bottom: none; }
+.ratings { display: flex; flex-wrap: wrap; gap: 12px; margin: 8px 0 18px; }
+.rating-badge { display: inline-flex; align-items: center; gap: 8px; background-color: #383838; padding: 6px 10px; border-radius: 6px; text-decoration: none; color: #d4d4d4; transition: background-color 0.15s; }
+.rating-badge:hover { background-color: #474747; text-decoration: none; }
+.rating-name { font-size: 0.9em; color: #cfcfcf; }
+.rating-badge .score { font-size: 0.95em; }
+.cast-list { display: flex; flex-wrap: wrap; gap: 10px 14px; }
+.cast-member { display: flex; gap: 8px; align-items: center; width: 220px; }
+.cast-photo { width: 45px; height: 60px; object-fit: cover; border-radius: 4px; flex-shrink: 0; background-color: #444; }
+.cast-photo-empty { display: inline-block; }
+.cast-info { display: flex; flex-direction: column; line-height: 1.25; min-width: 0; }
+.cast-char { color: #9a9a9a; font-size: 0.85em; }
+footer { text-align: center; margin-top: 30px; padding-top: 15px; border-top: 1px solid #444; font-size: 0.9em; color: #888; }
+@media (max-width: 768px) {
+  .container { margin: 0; padding: 15px; border-radius: 0; }
+  header h1 { font-size: 1.8em; }
+  h2 { font-size: 1.4em; margin-top: 18px; }
+  .screenshots-container { grid-template-columns: repeat(auto-fill, minmax(min(200px, 100%), 1fr)); gap: 10px; }
+  .details-table th, .details-table td { padding: 8px 10px; font-size: 0.95em; }
+}
+@media (max-width: 480px) {
+  .container { padding: 10px; }
+  header h1 { font-size: 1.5em; padding-bottom: 8px; }
+  h2 { font-size: 1.25em; }
+  .screenshots-container { grid-template-columns: 1fr; }
+  .details-table th { display: block; width: 100%; border-bottom: none; padding-bottom: 2px; }
+  .details-table td { display: block; width: 100%; padding-top: 2px; }
+}
+p { margin-bottom: 1em; }
+.main-content-grid { display: grid; grid-template-columns: 1fr; gap: 25px; }
+@media (min-width: 992px) { .main-content-grid { grid-template-columns: 2fr 1fr; } .description-section { grid-column: 1 / 2; } .sidebar-section { grid-column: 2 / 3; display: flex; flex-direction: column; } }
+.header-image { max-width: 100%; max-height: 300px; width: auto; border-radius: 6px; margin-bottom: 15px; object-fit: cover; display: block; margin-left: auto; margin-right: auto; }
+.description-content { background-color: #333; padding: 15px; border-radius: 5px; margin-top: 10px; overflow: hidden; }
+.description-content p { margin-bottom: 0.5em; }
+.description-content p:last-child { margin-bottom: 0; }
+.screenshot { width: 100%; height: auto; border-radius: 4px; border: 2px solid #444; object-fit: cover; transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out; }
+.screenshot:hover { transform: scale(1.03); box-shadow: 0 0 10px rgba(86,156,214,0.7); }
+.section-box { background-color: #333; padding: 20px; border-radius: 6px; margin-bottom: 20px; }
+.review { border-left: 4px solid #569cd6; padding-left: 15px; margin-bottom: 20px; background-color: #383838; padding: 15px; border-radius: 0 5px 5px 0; }
+.review strong { color: #9cdcfe; }
+.review-score { background-color: #4f4f4f; padding: 2px 8px; border-radius: 3px; font-size: 0.85em; margin-left: 8px; }
+.rec-badge { font-weight: bold; padding: 2px 8px; border-radius: 3px; font-size: 0.85em; }
+.rec-yes { background-color: #2e5e2e; color: #9fe09f; }
+.rec-no { background-color: #5e2e2e; color: #ff9b9b; }
+.review blockquote { margin: 8px 0 8px 20px; font-style: italic; color: #b0b0b0; border-left: 2px solid #555; padding-left: 10px; }
+.score-section p { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.star-rating { font-size: 1.2em; color: #ffc107; margin-left: 5px; }
+.star.empty { color: #555; }
+.details-table th { width: 35%; }
+@media (max-width: 768px) {
+  .section-box { padding: 15px; margin-bottom: 15px; }
+  .description-content { padding: 12px; }
+  .review { padding: 12px; margin-bottom: 15px; }
+  .review blockquote { margin-left: 10px; }
+}
+@media (max-width: 480px) {
+  .section-box { padding: 12px; border-radius: 4px; }
+  .description-content { padding: 10px; }
+  .review blockquote { margin-left: 0; padding-left: 8px; }
+  .details-table th { width: 100%; }
+}
+</style>
+</head>
+<body>
+<div class="container">
+<header>
+<h1>Chessmaster 9000</h1>
+</header>
+<div class="main-content-grid">
+<section class="description-section section-box">
+<h2>Description</h2>
+<div class="description-content">
+<p>Chessmaster 9000 is a 2002 chess video game developed and published by Ubi Soft for the Windows. It is part of the Chessmaster series. The game was announced on July 12, 2002. Grandmaster Larry Christiansen played four matches against the game in September 2002. He won the first match, lost the next two, and match four was a draw.</p></div>
+</section>
+
+<aside class="sidebar-section">
+<section class="section-box" id="details">
+<h2>Game Details</h2>
+<p>No specific game details available.</p>
+</section>
+
+<section class="section-box" id="scores">
+<h2>Scores &amp; Reviews</h2>
+<div class="score-section">
+<p><strong>Metacritic Score:</strong> <a href="https://www.metacritic.com/game/chessmaster-9000/" target="_blank" rel="noopener noreferrer" title="View on Metacritic"><span class="score score-8x">81</span></a>
+ <span class="star-rating"><span class="star filled">★</span><span class="star filled">★</span><span class="star filled">★</span><span class="star filled">★</span><span class="star empty">☆</span></span>
+</p>
+</div>
+<p>No reviews available for this game.</p>
+</section>
+
+<section class="section-box" id="links">
+<h2>Links</h2>
+<ul>
+<li><a href="https://www.metacritic.com/game/chessmaster-9000/" target="_blank" rel="noopener noreferrer">Metacritic Page</a></li><li><a href="https://en.wikipedia.org/wiki/Chessmaster_9000" target="_blank" rel="noopener noreferrer">Wikipedia Page</a></li><li><a href="https://www.mobygames.com/game/16417/chessmaster-9000/" target="_blank" rel="noopener noreferrer">MobyGames Page</a></li><li><a href="https://www.youtube.com/results?search_query=Chessmaster%209000%20gameplay" target="_blank" rel="noopener noreferrer">Search Gameplay on YouTube</a></li>
+</ul>
+</section>
+</aside>
+</div>
+
+<section class="section-box" id="screenshots-main">
+<h2>Screenshots</h2>
+<div class="screenshots-container">
+<p>No screenshots available.</p>
+</div>
+</section>
+<footer>Generated by GameInfoGenerator v1.0.1 on 2026-06-28 22:06:43</footer>
+</div>
+<div class="lightbox-overlay" id="lightbox">
+<span class="lightbox-close">&times;</span>
+<span class="lightbox-nav lightbox-prev">&#10094;</span>
+<span class="lightbox-nav lightbox-next">&#10095;</span>
+<img src="" alt="Lightbox">
+</div>
+<script>
+(function() {
+  /* --- GIF toggle --- */
+  document.querySelectorAll('img[src^="data:image/gif"]').forEach(function(img) {
+    var wrapper = document.createElement("div");
+    wrapper.className = "media-wrapper";
+    img.parentNode.insertBefore(wrapper, img);
+    wrapper.appendChild(img);
+    var canvas = document.createElement("canvas");
+    var btn = document.createElement("button");
+    btn.className = "media-toggle";
+    btn.textContent = "\u25B6";
+    btn.title = "Play/Pause GIF";
+    var paused = true;
+    function captureFrame() {
+      canvas.width = img.naturalWidth;
+      canvas.height = img.naturalHeight;
+      canvas.getContext("2d").drawImage(img, 0, 0);
+      wrapper.insertBefore(canvas, btn);
+    }
+    if (img.complete && img.naturalWidth > 0) { captureFrame(); }
+    else { img.addEventListener("load", function onLoad() { img.removeEventListener("load", onLoad); captureFrame(); }); }
+    wrapper.appendChild(btn);
+    btn.addEventListener("click", function(e) {
+      e.preventDefault(); e.stopPropagation();
+      if (paused) { canvas.style.display = "none"; btn.textContent = "\u23F8"; paused = false; }
+      else { captureFrame(); canvas.style.display = ""; btn.textContent = "\u25B6"; paused = true; }
+    });
+  });
+
+  /* --- Video toggle --- */
+  document.querySelectorAll(".description-content video[loop]").forEach(function(video) {
+    video.removeAttribute("autoplay");
+    video.pause();
+    var wrapper = document.createElement("div");
+    wrapper.className = "media-wrapper";
+    video.parentNode.insertBefore(wrapper, video);
+    wrapper.appendChild(video);
+    var btn = document.createElement("button");
+    btn.className = "media-toggle";
+    btn.textContent = "\u25B6";
+    btn.title = "Play/Pause";
+    wrapper.appendChild(btn);
+    btn.addEventListener("click", function(e) {
+      e.preventDefault(); e.stopPropagation();
+      if (video.paused) { video.play(); btn.textContent = "\u23F8"; }
+      else { video.pause(); btn.textContent = "\u25B6"; }
+    });
+  });
+
+  /* --- Lightbox --- */
+  var overlay = document.getElementById("lightbox");
+  var lbImg = overlay.querySelector("img");
+  var items = Array.from(document.querySelectorAll("[data-lightbox]"));
+  var currentIdx = -1;
+
+  function showLightbox(idx) {
+    if (idx < 0 || idx >= items.length) return;
+    currentIdx = idx;
+    lbImg.src = items[idx].getAttribute("data-lightbox");
+    overlay.classList.add("active");
+    document.body.style.overflow = "hidden";
+  }
+  function closeLightbox() {
+    overlay.classList.remove("active");
+    document.body.style.overflow = "";
+    lbImg.src = "";
+    currentIdx = -1;
+  }
+  function navigate(delta) {
+    if (currentIdx < 0) return;
+    var next = currentIdx + delta;
+    if (next >= 0 && next < items.length) showLightbox(next);
+  }
+
+  items.forEach(function(el, i) {
+    el.addEventListener("click", function(e) { e.preventDefault(); showLightbox(i); });
+  });
+  overlay.querySelector(".lightbox-close").addEventListener("click", closeLightbox);
+  overlay.querySelector(".lightbox-prev").addEventListener("click", function(e) { e.stopPropagation(); navigate(-1); });
+  overlay.querySelector(".lightbox-next").addEventListener("click", function(e) { e.stopPropagation(); navigate(1); });
+  overlay.addEventListener("click", function(e) { if (e.target === overlay) closeLightbox(); });
+  document.addEventListener("keydown", function(e) {
+    if (currentIdx < 0) return;
+    if (e.key === "Escape") closeLightbox();
+    else if (e.key === "ArrowLeft") navigate(-1);
+    else if (e.key === "ArrowRight") navigate(1);
+  });
+})();
+</script>
+</body>
+</html>
