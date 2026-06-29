@@ -89,6 +89,8 @@
     line-height: 1.6;
   }
   .install .c { color: #6a9955; }
+  .install code a { color: inherit; text-decoration: underline dotted; text-underline-offset: 3px; text-decoration-color: var(--muted); }
+  .install code a:hover { text-decoration: underline; text-decoration-color: var(--accent); }
   .install .more { margin: 14px 0 0; text-transform: none; letter-spacing: normal; font-size: 0.85rem; }
   .install .more a { color: var(--accent); text-decoration: none; }
   .install .more a:hover { text-decoration: underline; }
@@ -122,8 +124,9 @@
 
   <div class="install">
     <p>Install &amp; run</p>
-    <code><span class="c"># install both commands</span>
-uv tool install x-info-generators
+    <code><span class="c"># clone &amp; install both commands</span>
+git clone https://github.com/janroudaut/x-info-generators
+<a href="https://docs.astral.sh/uv/getting-started/installation/" target="_blank" rel="noopener">uv</a> tool install ./x-info-generators
 
 <span class="c"># generate a page</span>
 gen-game-info /path/to/game
