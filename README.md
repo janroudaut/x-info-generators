@@ -18,11 +18,11 @@ Every generated page is a **single portable `.html` file** — zero external dep
 uv tool install .
 ```
 
-This installs two commands: [🎬 **`video-info-gen`**](#-video-info-gen) and [🎮 **`game-info-gen`**](#-game-info-gen).
+This installs two commands: [🎬 **`gen-video-info`**](#-gen-video-info) and [🎮 **`gen-game-info`**](#-gen-game-info).
 
 ---
 
-## 🎬 video-info-gen
+## 🎬 gen-video-info
 
 Handles **movies and TV series**, deciding what each video *is* from its **content**, never from the folder name (a directory is just an organizational placeholder — `old`, `films 2024`, a "collection"…).
 
@@ -32,13 +32,13 @@ Handles **movies and TV series**, deciding what each video *is* from its **conte
 - Content not found on its metadata source (e.g. web-only clips) is **skipped** — no page is created.
 
 ```bash
-video-info-gen /path/to/The.Matrix.1999.mkv           # single movie
-video-info-gen -R /path/to/videos/                    # whole library (movies + series)
-video-info-gen -R --force /path/to/videos/            # force regeneration
-video-info-gen -R -C /path/to/videos/                 # remove generated HTML
+gen-video-info /path/to/The.Matrix.1999.mkv           # single movie
+gen-video-info -R /path/to/videos/                    # whole library (movies + series)
+gen-video-info -R --force /path/to/videos/            # force regeneration
+gen-video-info -R -C /path/to/videos/                 # remove generated HTML
 
 # Skip directories (repeatable; glob, case-insensitive; wrap in /.../ for a regex)
-video-info-gen -R --ignore '*Le dessous des images*' --ignore '/s\d+e\d+ sample/' /path/to/videos/
+gen-video-info -R --ignore '*Le dessous des images*' --ignore '/s\d+e\d+ sample/' /path/to/videos/
 ```
 
 A movie page (poster, ratings, cast, plot, Wikipedia, screenshots, related videos) and a series page (ratings, network, cast, then every season with its episodes):
@@ -58,15 +58,15 @@ Each season that lives in its own folder also gets a page listing every episode 
 </p>
 </details>
 
-## 🎮 game-info-gen
+## 🎮 gen-game-info
 
 Generates a `00_GAME_INFO.html` in each game directory, aggregating Steam, Metacritic, Wikipedia, MobyGames and Steam user reviews.
 
 ```bash
-game-info-gen "/path/to/Hollow Knight"      # single game
-game-info-gen -R /path/to/games/            # scan subdirectories as individual games
-game-info-gen -R --force /path/to/games/    # force regeneration
-game-info-gen -R -C /path/to/games/         # remove generated 00_GAME_INFO.html files
+gen-game-info "/path/to/Hollow Knight"      # single game
+gen-game-info -R /path/to/games/            # scan subdirectories as individual games
+gen-game-info -R --force /path/to/games/    # force regeneration
+gen-game-info -R -C /path/to/games/         # remove generated 00_GAME_INFO.html files
 ```
 
 A full game page — description, details, Metacritic + Steam reviews, links and a screenshot gallery:
@@ -85,13 +85,13 @@ A full game page — description, details, Metacritic + Steam reviews, links and
 
 ```bash
 # a videos catalog (scan the dir, write ./00_INDEX.html)
-video-info-gen --index /path/to/videos/
+gen-video-info --index /path/to/videos/
 
 # a games catalog
-game-info-gen --index /path/to/games/
+gen-game-info --index /path/to/games/
 
 # choose the output file
-video-info-gen --index my-catalog.html /path/to/videos/
+gen-video-info --index my-catalog.html /path/to/videos/
 ```
 
 A single-type catalog drops the type filter and names itself after that type (e.g. **Games**). The type is read from each page — so you *can* point one run at several roots for a combined catalog, but per-category is the usual case. Posters/headers are downscaled and inlined (one portable file); season pages are left out.
@@ -122,8 +122,8 @@ are retried on the next run. The cache **never expires on its own** — cleanup 
 | `--cache-ttl N` | Age in days used by `--purge-cache`; `0` purges everything (default: 30) |
 
 ```bash
-video-info-gen -R --offline --force /path/to/videos/   # re-render from cache, no network
-video-info-gen --purge-cache --cache-ttl 0             # wipe the cache
+gen-video-info -R --offline --force /path/to/videos/   # re-render from cache, no network
+gen-video-info --purge-cache --cache-ttl 0             # wipe the cache
 ```
 
 ## Common options
@@ -139,13 +139,13 @@ video-info-gen --purge-cache --cache-ttl 0             # wipe the cache
 | `-V, --version` | Show version |
 | `-h, --help` | Full, authoritative CLI reference |
 
-`--ignore` is specific to `video-info-gen`.
+`--ignore` is specific to `gen-video-info`.
 
 ## Supported video formats
 
 Common ones: `.mp4`, `.mkv`, `.avi`, `.mov`, `.webm`, `.ts`, `.mpg`, `.m4v`, `.wmv`, `.flv` — plus a broad set of other containers (`.m2ts`, `.mpeg`, `.vob`, `.3gp`, `.divx`, `.rmvb`, `.mxf`, …). In practice anything **FFmpeg** can read is fine.
 
-[FFmpeg](https://ffmpeg.org/) is **optional** — it's only used to extract screenshots. Without it in `PATH`, `video-info-gen` prints a warning and generates pages without screenshots (all other data is still fetched).
+[FFmpeg](https://ffmpeg.org/) is **optional** — it's only used to extract screenshots. Without it in `PATH`, `gen-video-info` prints a warning and generates pages without screenshots (all other data is still fetched).
 
 ## Data sources
 
@@ -188,8 +188,8 @@ Common ones: `.mp4`, `.mkv`, `.avi`, `.mov`, `.webm`, `.ts`, `.mpg`, `.m4v`, `.w
 ## Development
 
 ```bash
-uv run video-info-gen /path/to/movie.mkv     # dev run (resolves deps into .venv automatically)
-uv run game-info-gen /path/to/game
+uv run gen-video-info /path/to/movie.mkv     # dev run (resolves deps into .venv automatically)
+uv run gen-game-info /path/to/game
 
 uv tool install --force --reinstall .        # reinstall the global commands after changes
 ```
@@ -220,11 +220,11 @@ src/x_info_generators/
 │   ├── index.html.j2    # catalog page
 │   └── _series_macros.html.j2   # shared ratings_block, cast_list, episode_list macros
 ├── game/
-│   ├── cli.py           # game-info-gen entry point
+│   ├── cli.py           # gen-game-info entry point
 │   ├── fetchers.py      # Steam, Metacritic, Wikipedia, MobyGames
 │   └── processing.py    # clean_game_title, merge_data, process_game_directory
 └── video/
-    ├── cli.py           # video-info-gen entry point
+    ├── cli.py           # gen-video-info entry point
     ├── discovery.py     # content-based classification (movies vs series, collections)
     ├── fetchers.py      # Wikidata, imdbapi.dev, TVmaze, Rotten Tomatoes, Wikipedia, YouTube, FFmpeg
     └── processing.py    # process_movie_file, process_series

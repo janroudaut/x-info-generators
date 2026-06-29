@@ -29,8 +29,8 @@ Repository = "https://github.com/janroudaut/x-info-generators"
 Issues = "https://github.com/janroudaut/x-info-generators/issues"
 
 [project.scripts]
-video-info-gen = "x_info_generators.video.cli:main"
-game-info-gen = "x_info_generators.game.cli:main"
+gen-video-info = "x_info_generators.video.cli:main"
+gen-game-info = "x_info_generators.game.cli:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/x_info_generators"]

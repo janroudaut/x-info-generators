@@ -6,11 +6,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ```bash
 # Run during development — uv resolves deps from pyproject.toml into .venv automatically
-uv run game-info-gen /path/to/game
-uv run video-info-gen /path/to/movie.mkv
+uv run gen-game-info /path/to/game
+uv run gen-video-info /path/to/movie.mkv
 
 # Build a browsable catalog from already-generated pages (no network, no generation)
-uv run video-info-gen --index /path/to/videos/
+uv run gen-video-info --index /path/to/videos/
 
 # Install globally as user commands (production, after any change)
 uv tool install --force --reinstall .
@@ -25,7 +25,7 @@ There are no automated tests. Validation is done by running the commands against
 
 ## Architecture
 
-The package exposes two independent entry points (`game-info-gen`, `video-info-gen`) sharing a common async infrastructure in `src/x_info_generators/`.
+The package exposes two independent entry points (`gen-game-info`, `gen-video-info`) sharing a common async infrastructure in `src/x_info_generators/`.
 
 ### Data flow (both generators)
 
