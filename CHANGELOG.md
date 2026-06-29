@@ -3,6 +3,13 @@
 All notable changes to this project are documented here.
 This project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.2.0] — 2026-06-29
+
+### Changed
+- **Commands renamed** to a shared, tab-completion-friendly `gen-` prefix:
+  `game-info-gen` → **`gen-game-info`**, `video-info-gen` → **`gen-video-info`**.
+  After upgrading: `uv tool install --force --reinstall .`.
+
 ## [1.1.0] — 2026-06-29
 
 ### Added
