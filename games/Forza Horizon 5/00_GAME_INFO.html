@@ -55,12 +55,12 @@ a:hover { text-decoration: underline; color: #a8d4ff; }
 .rating-badge:hover { background-color: #474747; text-decoration: none; }
 .rating-name { font-size: 0.9em; color: #cfcfcf; }
 .rating-badge .score { font-size: 0.95em; }
-.cast-list { display: flex; flex-wrap: wrap; gap: 10px 14px; }
-.cast-member { display: flex; gap: 8px; align-items: center; width: 220px; }
+.cast-list { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 10px 14px; }
+.cast-member { display: flex; gap: 8px; align-items: flex-start; width: 220px; }
 .cast-photo { width: 45px; height: 60px; object-fit: cover; border-radius: 4px; flex-shrink: 0; background-color: #444; }
 .cast-photo-empty { display: inline-block; }
 .cast-info { display: flex; flex-direction: column; line-height: 1.25; min-width: 0; }
-.cast-char { color: #9a9a9a; font-size: 0.85em; }
+.cast-char { color: #9a9a9a; font-size: 0.85em; display: -webkit-box; -webkit-line-clamp: 3; line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
 footer { text-align: center; margin-top: 30px; padding-top: 15px; border-top: 1px solid #444; font-size: 0.9em; color: #888; }
 @media (max-width: 768px) {
   .container { margin: 0; padding: 15px; border-radius: 0; }
