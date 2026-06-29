@@ -66,12 +66,6 @@
   .card .emoji { font-size: 2.6rem; line-height: 1; }
   .card .title { font-size: 1.35rem; font-weight: 600; margin: 14px 0 4px; }
   .card .count { color: var(--muted); font-size: 0.95rem; }
-  .demo-note {
-    text-align: center;
-    color: var(--muted);
-    font-size: 0.9rem;
-    margin: 0 0 36px;
-  }
   .install {
     background: var(--code-bg);
     border: 1px solid var(--border);
@@ -91,9 +85,6 @@
   .install .c { color: #6a9955; }
   .install code a { color: inherit; text-decoration: underline dotted; text-underline-offset: 3px; text-decoration-color: var(--muted); }
   .install code a:hover { text-decoration: underline; text-decoration-color: var(--accent); }
-  .install .more { margin: 14px 0 0; text-transform: none; letter-spacing: normal; font-size: 0.85rem; }
-  .install .more a { color: var(--accent); text-decoration: none; }
-  .install .more a:hover { text-decoration: underline; }
   footer { text-align: center; color: var(--muted); font-size: 0.9rem; }
   footer a { color: var(--accent); text-decoration: none; }
   footer a:hover { text-decoration: underline; }
@@ -119,9 +110,6 @@
     </a>
   </div>
 
-  <p class="demo-note">A live demo built from real generator output — every page is a single
-  self-contained <code>.html</code> with all images inlined.</p>
-
   <div class="install">
     <p>Install &amp; run</p>
     <code><span class="c"># clone &amp; install both commands</span>
@@ -137,7 +125,6 @@ gen-video-info -R /path/to/library/
 
 <span class="c"># build a catalog from the pages already generated above</span>
 gen-video-info --index catalog.html /path/to/library/</code>
-    <p class="more">Full options &amp; docs on <a href="https://github.com/janroudaut/x-info-generators">GitHub</a></p>
   </div>
 
   <footer>
