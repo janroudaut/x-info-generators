@@ -55,6 +55,7 @@ The package exposes two independent entry points (`gen-game-info`, `gen-video-in
 - `game/processing.py::_merge_data()` handles priority: first non-empty value wins, except `name` and `description_html` prefer the longer string.
 - Images in Steam's `detailed_description` HTML are rewritten to base64 inline by `_download_and_rewrite_embedded_images()`.
 - Screenshots are fetched concurrently via `asyncio.gather` then encoded sequentially.
+- Video stills: `video/processing.py::_resolve_screenshots()` picks the source per `--screenshot-source` — online imdbapi.dev stills (`fetch_imdb_stills`) first, then ffmpeg on the local file as fallback (`auto`). `online`/`ffmpeg`/`off` force the behaviour. Online stills work without a local file (name-only generation).
 
 ### External APIs
 
@@ -64,12 +65,12 @@ The package exposes two independent entry points (`gen-game-info`, `gen-video-in
 | Metacritic | HTML scraping of `/game/{slug}/` (score via JSON-LD) |
 | MobyGames | HTML scraping of search results then game page |
 | Wikidata | Resolves a movie's IMDb id (CirrusSearch full-text + label search) |
-| imdbapi.dev | `api.imdbapi.dev/titles/{id}` + `/credits` for movies (note: `api.imdbapi.dev`, not `imdbapi.dev`) |
+| imdbapi.dev | `api.imdbapi.dev/titles/{id}` (+ `/credits`, `/images`) for movies (note: `api.imdbapi.dev`, not `imdbapi.dev`). `/images` provides online stills (`still_frame`, landscape) — the default screenshot source |
 | TVmaze | Series + all episodes + cast in one `singlesearch` call |
 | Rotten Tomatoes | Slug `m/{slug}` (movies) or `/tv/{slug}` (series) resolved by a direct GET — no Google scraping |
 | Wikipedia | `wikipedia` Python library (sync, run in executor) |
 | YouTube | Scraping `ytInitialData` JSON from search results page |
-| FFmpeg | `ffmpeg-python` for screenshot extraction (optional — skipped with a warning if not in PATH) |
+| FFmpeg | `ffmpeg-python` for screenshot extraction — now the **fallback** when a title has no online stills (`--screenshot-source` controls this; optional, skipped with a warning if not in PATH) |
 
 ### Template inheritance
 

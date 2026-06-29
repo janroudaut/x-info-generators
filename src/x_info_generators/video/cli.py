@@ -131,10 +131,12 @@ async def _main_loop(args: argparse.Namespace):
             if item.kind == "series":
                 item_stats = await process_series(
                     session, item, args.force, args.max_screenshots, args.debug, print, cache,
+                    args.screenshot_source,
                 )
             else:
                 item_stats = await process_movie_file(
                     session, item.video_path, args.force, args.max_screenshots, args.debug, print, cache,
+                    args.screenshot_source,
                 )
 
             run_stats.record(item_stats.status, item_stats.size_bytes)
@@ -166,6 +168,12 @@ def main():
         "--ignore", action="append", metavar="PATTERN", dest="ignore",
         help="Exclude paths matching PATTERN (glob-like, case-insensitive; "
              "wrap in /.../ for a regex). Repeatable.")
+    groups["generation"].add_argument(
+        "--screenshot-source", choices=["auto", "online", "ffmpeg", "off"],
+        default="auto", metavar="MODE", dest="screenshot_source",
+        help="Where stills come from: auto (online imdbapi.dev stills, ffmpeg "
+             "fallback) [default], online (imdbapi.dev only), ffmpeg (local file "
+             "only), off (none).")
 
     # Bare invocation: show the full help and exit cleanly (onboarding).
     if len(sys.argv) == 1:

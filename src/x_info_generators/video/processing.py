@@ -16,7 +16,8 @@ from ..processing import ItemStats
 from ..templates import render_template
 from .. import __version__
 from .fetchers import (
-    fetch_imdb_data, fetch_imdb_detail, fetch_imdb_rating, resolve_imdb_id_wikidata,
+    fetch_imdb_data, fetch_imdb_detail, fetch_imdb_rating, fetch_imdb_stills,
+    resolve_imdb_id_wikidata,
     generate_screenshots_async,
     fetch_rotten_tomatoes_data, fetch_wikipedia_data,
     fetch_youtube_trailer, fetch_youtube_reviews,
@@ -102,9 +103,35 @@ async def _cached_screenshots(cache, movie_path: Path, temp_dir: Path, max_scree
     return sources
 
 
+async def _resolve_screenshots(
+    strategy: str, cache, session: aiohttp.ClientSession, imdb_id: Optional[str],
+    video_path: Optional[Path], temp_dir: Path, n: int, log: Callable,
+) -> List[str]:
+    """Screenshot data URIs, honouring ``--screenshot-source``.
+
+    ``auto``: online stills (imdbapi.dev) first, ffmpeg fallback on the local file
+    when there are none. ``online``/``ffmpeg`` force one source; ``off`` yields none.
+    """
+    if strategy == "off":
+        return []
+    if strategy in ("auto", "online") and imdb_id:
+        urls = await _cached(cache, "imdb-stills", f"{imdb_id}|{n}",
+                             lambda: fetch_imdb_stills(session, imdb_id, n, log))
+        if urls:
+            encoded = [await cached_image_data_uri(session, u, cache, temp_dir, log, f"Still {i + 1}")
+                       for i, u in enumerate(urls)]
+            encoded = [e for e in encoded if e]
+            if encoded:
+                return encoded
+    if strategy in ("auto", "ffmpeg") and video_path is not None:
+        return await _cached_screenshots(cache, video_path, temp_dir, n, log)
+    return []
+
+
 async def process_movie_file(
     session: aiohttp.ClientSession, movie_path: Path,
     force: bool, max_screenshots: int, debug: bool, log: Callable, cache,
+    screenshot_source: str = "auto",
 ) -> ItemStats:
     """Main processing logic for a single movie file."""
     start_time = time.monotonic()
@@ -167,7 +194,9 @@ async def process_movie_file(
                                        lambda: fetch_youtube_trailer(session, title, movie_year, log)),
             "youtube_reviews": _cached(cache, "movie-yt-reviews", meta_key,
                                        lambda: fetch_youtube_reviews(session, title, movie_year, log)),
-            "screenshots": _cached_screenshots(cache, movie_path, temp_dir, max_screenshots, log),
+            "screenshots": _resolve_screenshots(screenshot_source, cache, session,
+                                                aggregated_data.get("imdb_id"), movie_path,
+                                                temp_dir, max_screenshots, log),
         }
         if aggregated_data.get("poster_url"):
             tasks["poster"] = cached_image_data_uri(session, aggregated_data["poster_url"], cache, temp_dir, log, "Poster")
@@ -183,7 +212,9 @@ async def process_movie_file(
                     log(f"    {D.ERROR} Task '{source_name}' failed: {data}")
                 continue
             if not data:
-                stats.failed_sources.append(source_name)
+                # Empty stills/poster aren't a "failed source" (e.g. --screenshot-source off).
+                if source_name not in ("screenshots", "poster"):
+                    stats.failed_sources.append(source_name)
                 continue
 
             if source_name in ("wikipedia", "rotten_tomatoes", "youtube_trailer", "youtube_reviews"):
@@ -295,6 +326,7 @@ def _build_seasons_view(item, imdb_episodes: Dict[int, list], owned: set) -> lis
 async def process_series(
     session: aiohttp.ClientSession, item,
     force: bool, max_screenshots: int, debug: bool, log: Callable, cache,
+    screenshot_source: str = "auto",
 ) -> ItemStats:
     """Process a TV series: one series page plus a page per dedicated season folder."""
     start_time = time.monotonic()
@@ -338,8 +370,10 @@ async def process_series(
         if meta.get("imdb_id"):
             tasks["imdb_rating"] = _cached(cache, "imdb-rating", meta["imdb_id"],
                                            lambda: fetch_imdb_rating(session, meta["imdb_id"], log))
-        if first_ep:
-            tasks["screenshots"] = _cached_screenshots(cache, first_ep, temp_dir, max_screenshots, log)
+        if screenshot_source != "off":
+            tasks["screenshots"] = _resolve_screenshots(screenshot_source, cache, session,
+                                                        meta.get("imdb_id"), first_ep,
+                                                        temp_dir, max_screenshots, log)
         if meta.get("poster_url"):
             tasks["poster"] = cached_image_data_uri(session, meta["poster_url"], cache, temp_dir, log, "Poster")
 

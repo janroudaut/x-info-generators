@@ -140,16 +140,22 @@ gen-video-info --purge-cache --cache-ttl 0             # wipe the cache
 | `--no-color` | Disable emoji and color output |
 | `--debug` | Print aggregated data for debugging |
 | `--max-screenshots N` | Limit number of screenshots (default: 8) |
+| `--screenshot-source MODE` | Where stills come from: `auto` (online, FFmpeg fallback — default), `online`, `ffmpeg`, `off` |
 | `-V, --version` | Show version |
 | `-h, --help` | Full, authoritative CLI reference |
 
-`--ignore` is specific to `gen-video-info`.
+`--ignore` and `--screenshot-source` are specific to `gen-video-info`.
 
 ## Supported video formats
 
 Common ones: `.mp4`, `.mkv`, `.avi`, `.mov`, `.webm`, `.ts`, `.mpg`, `.m4v`, `.wmv`, `.flv` — plus a broad set of other containers (`.m2ts`, `.mpeg`, `.vob`, `.3gp`, `.divx`, `.rmvb`, `.mxf`, …). In practice anything **FFmpeg** can read is fine.
 
-[FFmpeg](https://ffmpeg.org/) is **optional** — it's only used to extract screenshots. Without it in `PATH`, `gen-video-info` prints a warning and generates pages without screenshots (all other data is still fetched).
+By default stills are pulled **online** from imdbapi.dev (so a page has real
+screenshots even when generated from a name alone, with no local file), and
+[FFmpeg](https://ffmpeg.org/) is the **fallback** that extracts frames from the
+local video when no online stills exist. FFmpeg is therefore **optional** —
+without it in `PATH`, titles lacking online stills simply get no screenshots
+(everything else is still fetched). Control the source with `--screenshot-source`.
 
 ## Data sources
 
@@ -173,20 +179,21 @@ Common ones: `.mp4`, `.mkv`, `.avi`, `.mov`, `.webm`, `.ts`, `.mpg`, `.m4v`, `.w
 | Source | Data |
 |--------|------|
 | [Wikidata](https://www.wikidata.org/) | Resolves the IMDb id robustly (full-text + label search), avoiding IMDb's flaky search endpoint |
-| [imdbapi.dev](https://imdbapi.dev/) `/titles/{id}` | Title, year, IMDb rating, plot, poster, directors, cast (with characters & photos), genres |
+| [imdbapi.dev](https://imdbapi.dev/) `/titles/{id}` | Title, year, runtime, IMDb rating, plot, poster, directors, cast (with characters & photos), genres |
+| imdbapi.dev `/titles/{id}/images` | Online still frames (the default screenshot source) |
 | Rotten Tomatoes | Tomatometer + Audience scores (clickable rating badges) |
 | Wikipedia | Summary, page link |
 | YouTube | Official trailer, review/trivia videos with thumbnails |
-| FFmpeg | Screenshots extracted from the video |
+| FFmpeg | Screenshots extracted from the local video (fallback when no online stills) |
 
 **TV series**
 
 | Source | Data |
 |--------|------|
-| [TVmaze](https://www.tvmaze.com/api) | Series + all episodes + cast in one call: rating, genres, network, IMDb id, poster, per-season episode list (names, summaries, ratings) |
-| imdbapi.dev | IMDb rating badge (via the TVmaze-provided id) |
+| [TVmaze](https://www.tvmaze.com/api) | Series + all episodes + cast in one call: rating, genres, network, episode runtime, IMDb id, poster, per-season episode list (names, summaries, ratings) |
+| imdbapi.dev | IMDb rating badge + online still frames (via the TVmaze-provided id) |
 | Rotten Tomatoes (`/tv/`) | Tomatometer + Audience scores |
-| Wikipedia, YouTube, FFmpeg | As for movies (screenshots taken from the first owned episode) |
+| Wikipedia, YouTube, FFmpeg | As for movies (FFmpeg fallback takes frames from the first owned episode) |
 </details>
 
 ## Development

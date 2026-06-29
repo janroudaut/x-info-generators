@@ -3,6 +3,27 @@
 All notable changes to this project are documented here.
 This project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.3.0] — 2026-06-29
+
+### Added
+- **Online screenshots** — movie/series stills are now fetched from
+  imdbapi.dev (`/titles/{id}/images`) by default, so pages have real
+  screenshots even when generated from a name alone (no local file needed).
+  FFmpeg extraction becomes the fallback for titles without online stills.
+- **`--screenshot-source {auto,online,ffmpeg,off}`** (`gen-video-info`) to pick
+  the stills source — `auto` (default) tries online first then FFmpeg.
+
+## [1.2.2] — 2026-06-29
+
+### Added
+- **Runtime / episode length** shown on movie and series pages (and on catalog
+  cards): movies via imdbapi.dev `runtimeSeconds`, series via TVmaze
+  `averageRuntime`.
+
+### Changed
+- **Cast cards** top-aligned, with roles clamped to 3 lines (+ a tooltip) so
+  actors with many roles no longer stretch the row.
+
 ## [1.2.1] — 2026-06-29
 
 ### Changed

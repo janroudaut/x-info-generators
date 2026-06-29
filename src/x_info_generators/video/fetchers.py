@@ -141,6 +141,31 @@ async def fetch_imdb_rating(session: aiohttp.ClientSession, imdb_id: str, log) -
         return None
 
 
+async def fetch_imdb_stills(session: aiohttp.ClientSession, imdb_id: str, n: int, log) -> Optional[List[str]]:
+    """Up to ``n`` landscape still-frame image URLs for a title from imdbapi.dev.
+
+    Used as an online alternative to local ffmpeg extraction. Prefers genuine
+    ``still_frame`` images; tops up with other landscape (non-poster) images if
+    needed. One page (20 images) is plenty for typical ``n`` (≤ 8).
+    """
+    log(f"    {D.QUERY} IMDb: Fetching stills for {imdb_id}...")
+    try:
+        data = await _imdb_get_json(session, f"https://api.imdbapi.dev/titles/{imdb_id}/images")
+        images = (data or {}).get("images") or []
+        landscape = [i for i in images if (i.get("width") or 0) > (i.get("height") or 0) and i.get("url")]
+        stills = [i for i in landscape if i.get("type") == "still_frame"]
+        rest = [i for i in landscape if i.get("type") not in ("still_frame", "poster")]
+        ordered = sorted(stills, key=lambda i: i.get("width", 0), reverse=True) \
+            + sorted(rest, key=lambda i: i.get("width", 0), reverse=True)
+        urls = [i["url"] for i in ordered[:n]]
+        if urls:
+            log(f"    {D.SUCCESS_DATA} IMDb: {len(urls)} still(s) found.")
+        return urls or None
+    except Exception as e:
+        log(f"    {D.ERROR} IMDb: Error fetching stills for {imdb_id}: {e}")
+        return None
+
+
 async def fetch_imdb_data(session: aiohttp.ClientSession, title: str, year: Optional[str], log) -> Optional[Dict[str, Any]]:
     """Fallback movie lookup via the (flaky) IMDb search endpoint."""
     log(f"    {D.QUERY} IMDb: Searching for '{title}' ({year or 'N/A'})...")
