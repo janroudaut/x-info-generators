@@ -9,6 +9,10 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 - **Genre filter in the catalog** (`--index`) — a "All genres" dropdown in the
   toolbar (each genre with its item count), combinable with the search box and
   the type filter.
+- **Catalog search matches more than titles** — the search box also looks at
+  the year (typing "2004" lists that year's titles) and, for videos, the
+  directory path under the scanned root (a "007" collection folder), the cast
+  and the directors.
 
 ## [1.4.1] — 2026-07-18
 

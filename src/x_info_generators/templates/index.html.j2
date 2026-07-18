@@ -53,7 +53,7 @@ footer { text-align: center; margin-top: 30px; padding-top: 15px; border-top: 1p
 </header>
 
 <div class="toolbar">
-<input type="search" id="search" placeholder="Search by title…" autocomplete="off">
+<input type="search" id="search" placeholder="Search title, folder, cast, year…" autocomplete="off">
 {% if show_type_filter %}
 <select id="type">
 <option value="all">All types</option>
@@ -77,7 +77,7 @@ footer { text-align: center; margin-top: 30px; padding-top: 15px; border-top: 1p
 
 <div class="grid" id="grid">
 {% for e in entries %}
-<a class="card" href="{{ e.href }}" data-kind="{{ e.kind }}" data-title="{{ e.title | lower }}" data-year="{{ e.year or '' }}" data-score="{{ '%.3f' | format(e.sort_score) }}" data-genres="{{ e.genres | join('|') | lower }}">
+<a class="card" href="{{ e.href }}" data-kind="{{ e.kind }}" data-title="{{ e.title | lower }}" data-year="{{ e.year or '' }}" data-score="{{ '%.3f' | format(e.sort_score) }}" data-genres="{{ e.genres | join('|') | lower }}" data-path="{{ e.search_path }}" data-people="{{ e.people | join('|') | lower }}">
 <div class="thumb thumb-{{ e.kind }}">
 {% if e.thumb %}<img src="{{ e.thumb }}" alt="" loading="lazy">{% else %}<div class="noimg">{% if e.kind == 'game' %}🎮{% elif e.kind == 'series' %}📺{% else %}🎬{% endif %}</div>{% endif %}
 {% if show_type_filter %}<span class="kind kind-{{ e.kind }}">{{ e.kind }}</span>{% endif %}
@@ -130,7 +130,8 @@ footer { text-align: center; margin-top: 30px; padding-top: 15px; border-top: 1p
     cards.forEach(function(c) {
       var okType = (t === "all") || (c.dataset.kind === t);
       var okGenre = (g === "all") || ("|" + c.dataset.genres + "|").indexOf("|" + g + "|") !== -1;
-      var okText = !q || c.dataset.title.indexOf(q) !== -1;
+      var okText = !q || (c.dataset.title + " " + c.dataset.path + " " +
+                          c.dataset.people + " " + c.dataset.year).indexOf(q) !== -1;
       var show = okType && okGenre && okText;
       c.style.display = show ? "" : "none";
       if (show) visible++;

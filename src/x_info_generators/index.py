@@ -140,7 +140,21 @@ def parse_page(html_path: Path) -> Optional[Dict]:
     if img and img.get("src"):
         thumb = downscale_data_uri(img["src"])
 
+    # People the search box can match: directors + cast — videos only (matching
+    # a game by its studio isn't useful).
+    people = []
+    if kind != "game":
+        if "director(s)" in rows:
+            people += [p.strip() for p in rows["director(s)"].split(",") if p.strip()]
+        for el in soup.select(".cast-list .cast-info"):
+            name_el = el.select_one("a, span:not(.cast-char)")
+            if name_el:
+                people.append(name_el.get_text(strip=True))
+        seen = set()
+        people = [p for p in people if not (p.lower() in seen or seen.add(p.lower()))]
+
     return {
+        "people": people,
         "kind": kind,
         "title": title,
         "year": year,
@@ -201,10 +215,11 @@ def _href(out_dir: Path, html_path: Path, wsl: bool = False) -> str:
 
 
 def _iter_html(roots, output_path: Path, max_depth: int = 5):
-    """Yield ``*.html`` candidates under ``roots``, deduped, as a stream.
+    """Yield ``(candidate, scan_root)`` pairs for ``*.html`` under ``roots``, deduped.
 
     Walks with ``os.walk`` (following symlinked directories) and avoids a per-file
-    ``resolve()``. ``max_depth`` caps recursion depth (0 = the root itself).
+    ``resolve()``. ``max_depth`` caps recursion depth (0 = the root itself). The
+    root is yielded alongside so callers can derive root-relative paths.
     """
     seen = set()
     for root in roots:
@@ -212,7 +227,7 @@ def _iter_html(roots, output_path: Path, max_depth: int = 5):
         if root.is_file():
             if root.suffix.lower() == ".html" and root != output_path:
                 seen.add(root)
-                yield root
+                yield root, root.parent
             continue
         if not root.is_dir():
             continue
@@ -228,7 +243,7 @@ def _iter_html(roots, output_path: Path, max_depth: int = 5):
                 if f == output_path or f in seen:
                     continue
                 seen.add(f)
-                yield f
+                yield f, root
 
 
 _KIND_TITLE = {"game": "Games", "movie": "Movies", "series": "Series"}
@@ -251,13 +266,24 @@ def build_catalog(roots, output_path, log: Callable, max_depth: int = 5,
     by_kind = {"game": 0, "movie": 0, "series": 0}
     skipped = 0
     bar = tqdm(desc=f"{D.PROCESS} Scanning", unit=" file", leave=True)
-    for f in _iter_html(roots, output_path, max_depth):
+    for f, scan_root in _iter_html(roots, output_path, max_depth):
         bar.update(1)
         rec = parse_page(f)
         if not rec:
             skipped += 1
             continue
         rec["href"] = _href(out_dir, f, wsl)
+        # Directories under the scanned root, so the search box also matches
+        # folder names (e.g. a "007" collection folder) without the noise of
+        # the absolute path. Videos only — game folders just repeat the title.
+        rec["search_path"] = ""
+        if rec["kind"] != "game":
+            try:
+                rel_dir = f.parent.relative_to(scan_root).as_posix()
+            except ValueError:
+                rel_dir = f.parent.name
+            if rel_dir != ".":
+                rec["search_path"] = rel_dir.lower()
         rec["sort_score"] = _sort_score(rec["ratings"])
         entries.append(rec)
         by_kind[rec["kind"]] += 1
