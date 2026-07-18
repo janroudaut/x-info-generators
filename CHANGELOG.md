@@ -3,6 +3,13 @@
 All notable changes to this project are documented here.
 This project adheres to [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+- **Genre filter in the catalog** (`--index`) — a "All genres" dropdown in the
+  toolbar (each genre with its item count), combinable with the search box and
+  the type filter.
+
 ## [1.4.1] — 2026-07-18
 
 ### Fixed

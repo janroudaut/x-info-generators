@@ -62,6 +62,12 @@ footer { text-align: center; margin-top: 30px; padding-top: 15px; border-top: 1p
 {% if by_kind.series %}<option value="series">Series</option>{% endif %}
 </select>
 {% endif %}
+{% if all_genres %}
+<select id="genre">
+<option value="all">All genres</option>
+{% for g in all_genres %}<option value="{{ g.value }}">{{ g.label }} ({{ g.count }})</option>
+{% endfor %}</select>
+{% endif %}
 <select id="sort">
 <option value="title">Sort: Title</option>
 <option value="year">Sort: Year</option>
@@ -71,7 +77,7 @@ footer { text-align: center; margin-top: 30px; padding-top: 15px; border-top: 1p
 
 <div class="grid" id="grid">
 {% for e in entries %}
-<a class="card" href="{{ e.href }}" data-kind="{{ e.kind }}" data-title="{{ e.title | lower }}" data-year="{{ e.year or '' }}" data-score="{{ '%.3f' | format(e.sort_score) }}">
+<a class="card" href="{{ e.href }}" data-kind="{{ e.kind }}" data-title="{{ e.title | lower }}" data-year="{{ e.year or '' }}" data-score="{{ '%.3f' | format(e.sort_score) }}" data-genres="{{ e.genres | join('|') | lower }}">
 <div class="thumb thumb-{{ e.kind }}">
 {% if e.thumb %}<img src="{{ e.thumb }}" alt="" loading="lazy">{% else %}<div class="noimg">{% if e.kind == 'game' %}🎮{% elif e.kind == 'series' %}📺{% else %}🎬{% endif %}</div>{% endif %}
 {% if show_type_filter %}<span class="kind kind-{{ e.kind }}">{{ e.kind }}</span>{% endif %}
@@ -99,6 +105,7 @@ footer { text-align: center; margin-top: 30px; padding-top: 15px; border-top: 1p
 (function() {
   var search = document.getElementById("search");
   var typeSel = document.getElementById("type");
+  var genreSel = document.getElementById("genre");
   var sortSel = document.getElementById("sort");
   var grid = document.getElementById("grid");
   var empty = document.getElementById("empty");
@@ -118,11 +125,13 @@ footer { text-align: center; margin-top: 30px; padding-top: 15px; border-top: 1p
   function apply() {
     var q = search.value.trim().toLowerCase();
     var t = typeSel ? typeSel.value : "all";
+    var g = genreSel ? genreSel.value : "all";
     var visible = 0;
     cards.forEach(function(c) {
       var okType = (t === "all") || (c.dataset.kind === t);
+      var okGenre = (g === "all") || ("|" + c.dataset.genres + "|").indexOf("|" + g + "|") !== -1;
       var okText = !q || c.dataset.title.indexOf(q) !== -1;
-      var show = okType && okText;
+      var show = okType && okGenre && okText;
       c.style.display = show ? "" : "none";
       if (show) visible++;
     });
@@ -132,6 +141,7 @@ footer { text-align: center; margin-top: 30px; padding-top: 15px; border-top: 1p
 
   search.addEventListener("input", apply);
   if (typeSel) typeSel.addEventListener("change", apply);
+  if (genreSel) genreSel.addEventListener("change", apply);
   sortSel.addEventListener("change", apply);
 })();
 </script>

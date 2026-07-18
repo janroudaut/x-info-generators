@@ -279,12 +279,25 @@ def build_catalog(roots, output_path, log: Callable, max_depth: int = 5,
     if title is None:
         title = _KIND_TITLE[present_kinds[0]] if len(present_kinds) == 1 else "Catalog"
 
+    # Genre filter data: dedupe case-insensitively but keep the first-seen
+    # display casing, count occurrences, sort alphabetically.
+    genre_display: Dict[str, str] = {}
+    genre_counts: Dict[str, int] = {}
+    for e in entries:
+        for g in e["genres"]:
+            key = g.lower()
+            genre_display.setdefault(key, g)
+            genre_counts[key] = genre_counts.get(key, 0) + 1
+    all_genres = [{"value": k, "label": genre_display[k], "count": genre_counts[k]}
+                  for k in sorted(genre_display)]
+
     html = render_template(
         "index.html.j2",
         entries=entries,
         by_kind=by_kind,
         total=len(entries),
         title=title,
+        all_genres=all_genres,
         show_type_filter=len(present_kinds) > 1,
         generator_name="CatalogIndexGenerator",
         version=__version__,
