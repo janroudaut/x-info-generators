@@ -114,7 +114,7 @@ A full game page — description, details, Metacritic + Steam reviews, links and
 
 ## 🗂️ Catalog (`--index`)
 
-`--index` builds a single, browsable **catalog** from the pages **already generated** on disk — no generation, no network. It scans the given paths for generated `.html`, reads each page (title, type, year, ratings, poster) and writes a self-contained catalog file (`00_INDEX.html` by default) with client-side **search, type & genre filters and sort**. The video catalog is the page at the top of this README; here's a games one:
+`--index` builds a single, browsable **catalog** from the pages **already generated** on disk — no generation, no network. It scans the given paths for generated `.html`, reads each page (title, type, year, ratings, poster) and writes a self-contained catalog file (`00_INDEX.html` by default) with client-side **search, type & genre filters and sort**. The search box matches the **title and year** — and, for videos, also the **folder path** under the scanned root (type `007` to list a whole collection folder), the **cast** and the **directors**. Terms combine (AND): `keanu 1999` lists Keanu Reeves titles from 1999. The video catalog is the page at the top of this README; here's a games one:
 
 <p align="center">
   <img src="assets/screenshots/catalog-games.png" width="760" alt="A games catalog">

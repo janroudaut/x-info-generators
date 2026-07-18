@@ -123,15 +123,18 @@ footer { text-align: center; margin-top: 30px; padding-top: 15px; border-top: 1p
   }
 
   function apply() {
-    var q = search.value.trim().toLowerCase();
+    var terms = search.value.trim().toLowerCase().split(/\s+/).filter(Boolean);
     var t = typeSel ? typeSel.value : "all";
     var g = genreSel ? genreSel.value : "all";
     var visible = 0;
     cards.forEach(function(c) {
       var okType = (t === "all") || (c.dataset.kind === t);
       var okGenre = (g === "all") || ("|" + c.dataset.genres + "|").indexOf("|" + g + "|") !== -1;
-      var okText = !q || (c.dataset.title + " " + c.dataset.path + " " +
-                          c.dataset.people + " " + c.dataset.year).indexOf(q) !== -1;
+      var hay = c.dataset.title + " " + c.dataset.path + " " +
+                c.dataset.people + " " + c.dataset.year;
+      // Every whitespace-separated term must match somewhere ("keanu 1999"
+      // = Keanu Reeves movies from 1999).
+      var okText = terms.every(function(term) { return hay.indexOf(term) !== -1; });
       var show = okType && okGenre && okText;
       c.style.display = show ? "" : "none";
       if (show) visible++;

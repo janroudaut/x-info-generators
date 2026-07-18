@@ -3,7 +3,7 @@
 All notable changes to this project are documented here.
 This project adheres to [Semantic Versioning](https://semver.org/).
 
-## [Unreleased]
+## [1.5.0] — 2026-07-18
 
 ### Added
 - **Genre filter in the catalog** (`--index`) — a "All genres" dropdown in the
@@ -12,7 +12,8 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 - **Catalog search matches more than titles** — the search box also looks at
   the year (typing "2004" lists that year's titles) and, for videos, the
   directory path under the scanned root (a "007" collection folder), the cast
-  and the directors.
+  and the directors. Whitespace-separated terms combine (AND): "keanu 1999"
+  lists Keanu Reeves titles from 1999.
 
 ## [1.4.1] — 2026-07-18
 
