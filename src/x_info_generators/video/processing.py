@@ -63,15 +63,25 @@ def find_movie_files(path: Path) -> List[Path]:
 def clean_filename_to_title(filepath: Path) -> tuple[str, Optional[str]]:
     """Extract movie title and year from a filename."""
     name = filepath.stem
+
+    # A year in (...) or [...] is explicitly the release year and ends the
+    # title — so a bare year *inside* the title survives ("New-york 1997
+    # (1981)" → "New york 1997", 1981) instead of truncating the title there.
+    year = None
+    bracketed = re.search(r'[(\[]\s*(19[0-9]{2}|20[0-2][0-9]|2030)\s*[)\]]', name)
+    if bracketed:
+        year = bracketed.group(1)
+        name = name[:bracketed.start()]
+
     name = re.sub(r'\[.*?\]', '', name)
     name = re.sub(r'\(.*?\)', '', name)
     name = re.sub(r'[\._-]', ' ', name)
 
-    year_match = re.search(r'\b(19[0-9]{2}|20[0-2][0-9]|2030)\b', name)
-    year = None
-    if year_match:
-        year = year_match.group(1)
-        name = name[:year_match.start()].strip()
+    if not year:
+        year_match = re.search(r'\b(19[0-9]{2}|20[0-2][0-9]|2030)\b', name)
+        if year_match:
+            year = year_match.group(1)
+            name = name[:year_match.start()].strip()
 
     name = NOISE_REGEX.sub('', name).strip()
     name = re.sub(r'\s+', ' ', name)

@@ -3,6 +3,15 @@
 All notable changes to this project are documented here.
 This project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.4.1] — 2026-07-18
+
+### Fixed
+- **Filename parsing: a year in parentheses/brackets wins** and marks the end
+  of the title, so titles containing a bare year are no longer truncated there
+  ("New-york 1997 (1981)…" is now searched as "New york 1997" (1981) — i.e.
+  *Escape from New York* — instead of "New york" (1997)). The bare-year
+  truncation remains as fallback for names like `The.Matrix.1999.1080p.mkv`.
+
 ## [1.4.0] — 2026-07-18
 
 ### Added
