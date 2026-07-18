@@ -16,7 +16,7 @@ from ..processing import ItemStats
 from ..templates import render_template
 from .. import __version__
 from .fetchers import (
-    fetch_imdb_data, fetch_imdb_detail, fetch_imdb_rating, fetch_imdb_stills,
+    fetch_tmdb_search, fetch_tmdb_detail, fetch_tmdb_rating, fetch_tmdb_stills,
     resolve_imdb_id_wikidata,
     generate_screenshots_async,
     fetch_rotten_tomatoes_data, fetch_wikipedia_data,
@@ -109,14 +109,15 @@ async def _resolve_screenshots(
 ) -> List[str]:
     """Screenshot data URIs, honouring ``--screenshot-source``.
 
-    ``auto``: online stills (imdbapi.dev) first, ffmpeg fallback on the local file
-    when there are none. ``online``/``ffmpeg`` force one source; ``off`` yields none.
+    ``auto``: online stills (TMDB backdrops) first, ffmpeg fallback on the local
+    file when there are none. ``online``/``ffmpeg`` force one source; ``off``
+    yields none.
     """
     if strategy == "off":
         return []
     if strategy in ("auto", "online") and imdb_id:
-        urls = await _cached(cache, "imdb-stills", f"{imdb_id}|{n}",
-                             lambda: fetch_imdb_stills(session, imdb_id, n, log))
+        urls = await _cached(cache, "tmdb-stills", f"{imdb_id}|{n}",
+                             lambda: fetch_tmdb_stills(session, imdb_id, n, log))
         if urls:
             encoded = [await cached_image_data_uri(session, u, cache, temp_dir, log, f"Still {i + 1}")
                        for i, u in enumerate(urls)]
@@ -149,35 +150,35 @@ async def process_movie_file(
             return stats
 
         # Resolve the IMDb id via Wikidata (reliable) and read full metadata from
-        # the dependable /titles/{id} endpoint; fall back to the flaky IMDb search.
+        # TMDB (mapped via /find); fall back to a TMDB title search.
         imdb_id = await _cached(
             cache, "wikidata-imdb", f"{clean_title}|{year or ''}",
             lambda: resolve_imdb_id_wikidata(session, clean_title, year, log),
         )
         if imdb_id:
-            imdb_data = await _cached(
-                cache, "movie-imdb-detail", imdb_id,
-                lambda: fetch_imdb_detail(session, imdb_id, log),
+            tmdb_data = await _cached(
+                cache, "movie-tmdb-detail", imdb_id,
+                lambda: fetch_tmdb_detail(session, imdb_id, log),
             )
         else:
-            imdb_data = await _cached(
-                cache, "movie-imdb", f"{clean_title}|{year or ''}",
-                lambda: fetch_imdb_data(session, clean_title, year, log),
+            tmdb_data = await _cached(
+                cache, "movie-tmdb-search", f"{clean_title}|{year or ''}",
+                lambda: fetch_tmdb_search(session, clean_title, year, log),
             )
 
-        if imdb_data:
-            aggregated_data = imdb_data
+        if tmdb_data:
+            aggregated_data = tmdb_data
         elif imdb_id:
-            # The film is identified (Wikidata gave an IMDb id) but imdbapi's detail
-            # endpoint failed (it 500s transiently). Don't drop the page — build a
+            # The film is identified (Wikidata gave an IMDb id) but the TMDB lookup
+            # failed (no key, or transient error). Don't drop the page — build a
             # partial one from the filename + id, enriched by the other sources.
-            log(f"    {D.WARNING} IMDb detail unavailable; building partial page.")
-            stats.failed_sources.append("IMDb")
+            log(f"    {D.WARNING} TMDB detail unavailable; building partial page.")
+            stats.failed_sources.append("TMDB")
             aggregated_data = {"title": clean_title, "year": year, "imdb_id": imdb_id}
         else:
             # Not identified anywhere (e.g. web-only clips) → skip.
             stats.status = "INSUFFICIENT_DATA"
-            stats.failed_sources.append("IMDb")
+            stats.failed_sources.append("TMDB")
             return stats
 
         title = aggregated_data["title"]
@@ -368,8 +369,8 @@ async def process_series(
                                        lambda: fetch_youtube_reviews(session, meta["title"], meta.get("year"), log)),
         }
         if meta.get("imdb_id"):
-            tasks["imdb_rating"] = _cached(cache, "imdb-rating", meta["imdb_id"],
-                                           lambda: fetch_imdb_rating(session, meta["imdb_id"], log))
+            tasks["tmdb_rating"] = _cached(cache, "tmdb-rating", meta["imdb_id"],
+                                           lambda: fetch_tmdb_rating(session, meta["imdb_id"], log))
         if screenshot_source != "off":
             tasks["screenshots"] = _resolve_screenshots(screenshot_source, cache, session,
                                                         meta.get("imdb_id"), first_ep,
@@ -380,8 +381,8 @@ async def process_series(
         results = dict(zip(tasks.keys(), await asyncio.gather(*tasks.values(), return_exceptions=True)))
 
         data = {k: v for k, v in meta.items() if k != "episodes_by_season"}
-        # The IMDb badge must show the IMDb rating, not TVmaze's — clear it and let
-        # the imdb_rating task fill it (no mislabeled badge if that lookup fails).
+        # The TMDB badge must show the TMDB rating, not TVmaze's — clear it and let
+        # the tmdb_rating task fill it (no mislabeled badge if that lookup fails).
         data["rating"] = None
         for name, val in results.items():
             if isinstance(val, Exception):
@@ -393,7 +394,7 @@ async def process_series(
                 if name not in ("screenshots", "poster"):
                     stats.failed_sources.append(name)
                 continue
-            if name in ("wikipedia", "rotten_tomatoes", "youtube_trailer", "youtube_reviews", "imdb_rating"):
+            if name in ("wikipedia", "rotten_tomatoes", "youtube_trailer", "youtube_reviews", "tmdb_rating"):
                 data.update(val)
             elif name == "poster":
                 data["poster_src"] = val

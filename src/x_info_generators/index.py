@@ -73,7 +73,9 @@ def _parse_ratings(soup, kind: str) -> Dict[str, float]:
         if val is None:
             continue
         name = name_el.get_text()
-        if "IMDb" in name:
+        if "TMDB" in name:
+            ratings["tmdb"] = val
+        elif "IMDb" in name:  # pages generated before the TMDB migration
             ratings["imdb"] = val
         elif "Tomatometer" in name:
             ratings["rt_critics"] = int(val)
@@ -152,6 +154,8 @@ def parse_page(html_path: Path) -> Optional[Dict]:
 
 def _sort_score(ratings: Dict[str, float]) -> float:
     """A single 0–10 value for sorting across mixed rating scales."""
+    if "tmdb" in ratings:
+        return ratings["tmdb"]
     if "imdb" in ratings:
         return ratings["imdb"]
     if "rt_critics" in ratings:

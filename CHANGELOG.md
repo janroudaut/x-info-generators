@@ -3,6 +3,25 @@
 All notable changes to this project are documented here.
 This project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.4.0] — 2026-07-18
+
+### Added
+- **`--tmdb-api-key KEY`** (`gen-video-info`, new "network" option group) to
+  pass the TMDB key on the command line; overrides the `TMDB_API_KEY`
+  environment variable.
+
+### Changed
+- **Movie metadata now comes from TMDB** — imdbapi.dev vanished (the domain no
+  longer resolves), so `gen-video-info` fetches movie details, cast, posters
+  and online stills (backdrops) from [TMDB](https://www.themoviedb.org/)
+  instead. The Wikidata → IMDb-id resolution is unchanged; TMDB maps the id
+  via `/find/{imdb_id}`. Requires a free API key in **`TMDB_API_KEY`** (v3 key
+  or v4 read access token) or via **`--tmdb-api-key KEY`**; without it, movie
+  pages degrade to partial pages and a warning is printed.
+- Rating badges on pages and catalogs are now labelled **TMDB** (TMDB
+  community rating, linking to the TMDB page) instead of IMDb. Catalogs still
+  recognise the IMDb badge of previously generated pages.
+
 ## [1.3.0] — 2026-06-29
 
 ### Added

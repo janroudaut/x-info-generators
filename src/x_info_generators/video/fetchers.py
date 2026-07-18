@@ -1,4 +1,5 @@
 import asyncio
+import os
 import json
 import re
 import shutil
@@ -38,21 +39,21 @@ def _strip_html(text: Optional[str]) -> Optional[str]:
     return "\n\n".join(parts) or None
 
 
-# --- FreeIMDb API (replaces cinemagoer) ---
+# --- Shared JSON-over-HTTP helper ---
 
-# api.imdbapi.dev rate-limits aggressively (429) and occasionally 500s. Retry
-# transient failures with exponential backoff so a series' burst of calls
-# (search + details + one per owned season) survives a cold run.
-_IMDB_RETRY_STATUS = {429, 500, 502, 503, 504}
+# Public APIs rate-limit (429) and occasionally 500. Retry transient failures
+# with exponential backoff so a series' burst of calls (find + details + one
+# per owned season) survives a cold run.
+_RETRY_STATUS = {429, 500, 502, 503, 504}
 
 
-async def _imdb_get_json(session: aiohttp.ClientSession, url: str, *, retries: int = 4, timeout: int = 15, headers=None):
+async def _get_json_retry(session: aiohttp.ClientSession, url: str, *, retries: int = 4, timeout: int = 15, headers=None):
     delay = 2.0
     last_exc = None
     for attempt in range(retries + 1):
         try:
             async with session.get(url, timeout=aiohttp.ClientTimeout(total=timeout), headers=headers) as resp:
-                if resp.status in _IMDB_RETRY_STATUS and attempt < retries:
+                if resp.status in _RETRY_STATUS and attempt < retries:
                     await asyncio.sleep(delay)
                     delay *= 2
                     continue
@@ -70,128 +71,165 @@ async def _imdb_get_json(session: aiohttp.ClientSession, url: str, *, retries: i
     return None
 
 
-def _imdb_persons(persons) -> List[Dict[str, str]]:
-    if not persons:
-        return []
-    return [
-        {"id": p.get("id", ""), "name": p.get("displayName", "")}
-        for p in persons if p.get("displayName")
+# --- TMDB (replaces the defunct imdbapi.dev) ---
+
+# Requires a free API key (https://www.themoviedb.org/settings/api) in the
+# TMDB_API_KEY environment variable. Accepts either a v3 key (hex string,
+# passed as ?api_key=) or a v4 read access token (JWT, passed as a Bearer
+# header). The Wikidata-resolved IMDb id maps to a TMDB id via /find.
+_TMDB_API = "https://api.themoviedb.org/3"
+_TMDB_IMG = "https://image.tmdb.org/t/p"
+
+
+def tmdb_available() -> bool:
+    return bool(os.environ.get("TMDB_API_KEY", "").strip())
+
+
+async def _tmdb_get_json(session: aiohttp.ClientSession, path: str, **params):
+    key = os.environ.get("TMDB_API_KEY", "").strip()
+    if not key:
+        return None  # the CLI warns once at startup
+    headers = None
+    if "." in key:  # v4 read access token (JWT)
+        headers = {"Authorization": f"Bearer {key}"}
+    else:  # v3 key
+        params["api_key"] = key
+    url = f"{_TMDB_API}{path}"
+    if params:
+        url += "?" + urllib.parse.urlencode(params)
+    return await _get_json_retry(session, url, headers=headers)
+
+
+async def _tmdb_find(session: aiohttp.ClientSession, imdb_id: str):
+    """Map an IMDb id to ("movie"|"tv", tmdb result dict), or (None, None)."""
+    data = await _tmdb_get_json(session, f"/find/{imdb_id}", external_source="imdb_id")
+    for media_type, bucket in (("movie", "movie_results"), ("tv", "tv_results")):
+        results = (data or {}).get(bucket) or []
+        if results:
+            return media_type, results[0]
+    return None, None
+
+
+def _tmdb_rating(node) -> Optional[float]:
+    if not node.get("vote_count"):
+        return None  # unvoted titles report vote_average 0, not "no data"
+    avg = node.get("vote_average")
+    return round(avg, 1) if avg else None
+
+
+def _tmdb_person(p, image_size: Optional[str] = None) -> Dict[str, Any]:
+    entry = {
+        "name": p.get("name"),
+        "url": f"https://www.themoviedb.org/person/{p['id']}" if p.get("id") else None,
+    }
+    if image_size:
+        profile = p.get("profile_path")
+        entry["image_url"] = f"{_TMDB_IMG}/{image_size}{profile}" if profile else None
+    return entry
+
+
+async def _fetch_tmdb_movie(session: aiohttp.ClientSession, tmdb_id: int, log) -> Optional[Dict[str, Any]]:
+    detail = await _tmdb_get_json(session, f"/movie/{tmdb_id}", append_to_response="credits")
+    if not detail:
+        return None
+    credits = detail.get("credits") or {}
+    cast = [
+        {**_tmdb_person(c, "w342"), "character": c.get("character") or None}
+        for c in (credits.get("cast") or [])[:12] if c.get("name")
     ]
+    directors = [_tmdb_person(p) for p in credits.get("crew") or []
+                 if p.get("job") == "Director" and p.get("name")]
+    release = detail.get("release_date") or ""
+    result = {
+        "title": detail.get("title"),
+        "year": release[:4] or None,
+        "rating": _tmdb_rating(detail),
+        "plot": detail.get("overview") or "Plot summary not available.",
+        "poster_url": f"{_TMDB_IMG}/w780{detail['poster_path']}" if detail.get("poster_path") else None,
+        "directors": directors,
+        "cast": cast,
+        "genres": [g["name"] for g in detail.get("genres") or [] if g.get("name")],
+        "runtime_seconds": detail["runtime"] * 60 if detail.get("runtime") else None,
+        "imdb_id": detail.get("imdb_id"),
+        "tmdb_id": detail.get("id"),
+        "tmdb_type": "movie",
+    }
+    log(f"    {D.SUCCESS_DATA} TMDB: Found '{result['title']}' ({result['year']})")
+    return result
 
 
-async def _fetch_imdb_cast(session: aiohttp.ClientSession, imdb_id: str) -> List[Dict[str, Any]]:
-    """Cast with character names and actor photos via /credits."""
-    data = await _imdb_get_json(session, f"https://api.imdbapi.dev/titles/{imdb_id}/credits?categories=cast")
-    cast = []
-    for c in (data or {}).get("credits", [])[:12]:
-        name = c.get("name") or {}
-        if not name.get("displayName"):
-            continue
-        chars = c.get("characters") or []
-        cast.append({
-            "name": name["displayName"],
-            "url": f"https://www.imdb.com/name/{name['id']}" if name.get("id") else None,
-            "character": ", ".join(chars) if chars else None,
-            "image_url": (name.get("primaryImage") or {}).get("url"),
-        })
-    return cast
-
-
-async def fetch_imdb_detail(session: aiohttp.ClientSession, imdb_id: str, log) -> Optional[Dict[str, Any]]:
-    """Fetch a movie's full metadata from the reliable /titles/{id} endpoint."""
+async def fetch_tmdb_detail(session: aiohttp.ClientSession, imdb_id: str, log) -> Optional[Dict[str, Any]]:
+    """Fetch a movie's full metadata from TMDB via its IMDb id."""
     try:
-        detail = await _imdb_get_json(session, f"https://api.imdbapi.dev/titles/{imdb_id}")
-        if not detail:
+        media_type, hit = await _tmdb_find(session, imdb_id)
+        if media_type != "movie":
             return None
-        try:
-            cast = await _fetch_imdb_cast(session, imdb_id)
-        except Exception:
-            cast = []
-        if not cast:  # fallback to the lightweight stars list (names only)
-            cast = [{"name": p["name"], "url": f"https://www.imdb.com/name/{p['id']}" if p["id"] else None,
-                     "character": None, "image_url": None}
-                    for p in _imdb_persons(detail.get("stars", []))[:10]]
-        result = {
-            "title": detail.get("primaryTitle"),
-            "year": detail.get("startYear"),
-            "rating": detail.get("rating", {}).get("aggregateRating") if detail.get("rating") else None,
-            "plot": detail.get("plot", "Plot summary not available."),
-            "poster_url": detail.get("primaryImage", {}).get("url") if detail.get("primaryImage") else None,
-            "directors": _imdb_persons(detail.get("directors", [])),
-            "cast": cast,
-            "genres": detail.get("genres", []),
-            "runtime_seconds": detail.get("runtimeSeconds"),
-            "imdb_id": detail.get("id"),
-        }
-        log(f"    {D.SUCCESS_DATA} IMDb: Found '{result['title']}' ({result['year']})")
+        result = await _fetch_tmdb_movie(session, hit["id"], log)
+        if result and not result.get("imdb_id"):
+            result["imdb_id"] = imdb_id
         return result
     except Exception as e:
-        log(f"    {D.ERROR} IMDb: Error fetching detail for {imdb_id}: {e}")
+        log(f"    {D.ERROR} TMDB: Error fetching detail for {imdb_id}: {e}")
         return None
 
 
-async def fetch_imdb_rating(session: aiohttp.ClientSession, imdb_id: str, log) -> Optional[Dict[str, Any]]:
-    """Just the IMDb aggregate rating for a title (used to give series an IMDb badge)."""
+async def fetch_tmdb_rating(session: aiohttp.ClientSession, imdb_id: str, log) -> Optional[Dict[str, Any]]:
+    """Just the TMDB rating for a title (used to give series a rating badge)."""
     try:
-        detail = await _imdb_get_json(session, f"https://api.imdbapi.dev/titles/{imdb_id}")
-        rating = (detail or {}).get("rating", {}).get("aggregateRating") if detail else None
-        return {"rating": rating} if rating is not None else None
+        media_type, hit = await _tmdb_find(session, imdb_id)
+        if not hit:
+            return None
+        rating = _tmdb_rating(hit)
+        if rating is None:
+            return None
+        return {"rating": rating, "tmdb_id": hit.get("id"), "tmdb_type": media_type}
     except Exception as e:
-        log(f"    {D.ERROR} IMDb: Error fetching rating for {imdb_id}: {e}")
+        log(f"    {D.ERROR} TMDB: Error fetching rating for {imdb_id}: {e}")
         return None
 
 
-async def fetch_imdb_stills(session: aiohttp.ClientSession, imdb_id: str, n: int, log) -> Optional[List[str]]:
-    """Up to ``n`` landscape still-frame image URLs for a title from imdbapi.dev.
+async def fetch_tmdb_stills(session: aiohttp.ClientSession, imdb_id: str, n: int, log) -> Optional[List[str]]:
+    """Up to ``n`` landscape backdrop image URLs for a title from TMDB.
 
-    Used as an online alternative to local ffmpeg extraction. Prefers genuine
-    ``still_frame`` images; tops up with other landscape (non-poster) images if
-    needed. One page (20 images) is plenty for typical ``n`` (≤ 8).
+    Used as an online alternative to local ffmpeg extraction. Prefers textless
+    backdrops (iso_639_1 null) over ones carrying a language, then the
+    community's vote order; works for both movies and series.
     """
-    log(f"    {D.QUERY} IMDb: Fetching stills for {imdb_id}...")
+    log(f"    {D.QUERY} TMDB: Fetching stills for {imdb_id}...")
     try:
-        data = await _imdb_get_json(session, f"https://api.imdbapi.dev/titles/{imdb_id}/images")
-        images = (data or {}).get("images") or []
-        landscape = [i for i in images if (i.get("width") or 0) > (i.get("height") or 0) and i.get("url")]
-        stills = [i for i in landscape if i.get("type") == "still_frame"]
-        rest = [i for i in landscape if i.get("type") not in ("still_frame", "poster")]
-        ordered = sorted(stills, key=lambda i: i.get("width", 0), reverse=True) \
-            + sorted(rest, key=lambda i: i.get("width", 0), reverse=True)
-        urls = [i["url"] for i in ordered[:n]]
+        media_type, hit = await _tmdb_find(session, imdb_id)
+        if not hit:
+            return None
+        data = await _tmdb_get_json(session, f"/{media_type}/{hit['id']}/images")
+        backdrops = (data or {}).get("backdrops") or []
+        ordered = sorted(backdrops, key=lambda b: (b.get("iso_639_1") is not None,
+                                                   -(b.get("vote_average") or 0)))
+        urls = [f"{_TMDB_IMG}/w1280{b['file_path']}" for b in ordered if b.get("file_path")][:n]
         if urls:
-            log(f"    {D.SUCCESS_DATA} IMDb: {len(urls)} still(s) found.")
+            log(f"    {D.SUCCESS_DATA} TMDB: {len(urls)} still(s) found.")
         return urls or None
     except Exception as e:
-        log(f"    {D.ERROR} IMDb: Error fetching stills for {imdb_id}: {e}")
+        log(f"    {D.ERROR} TMDB: Error fetching stills for {imdb_id}: {e}")
         return None
 
 
-async def fetch_imdb_data(session: aiohttp.ClientSession, title: str, year: Optional[str], log) -> Optional[Dict[str, Any]]:
-    """Fallback movie lookup via the (flaky) IMDb search endpoint."""
-    log(f"    {D.QUERY} IMDb: Searching for '{title}' ({year or 'N/A'})...")
-    search_url = f"https://api.imdbapi.dev/search/titles?query={urllib.parse.quote(title)}&limit=10"
+async def fetch_tmdb_search(session: aiohttp.ClientSession, title: str, year: Optional[str], log) -> Optional[Dict[str, Any]]:
+    """Fallback movie lookup via TMDB search (when Wikidata yields no IMDb id)."""
+    log(f"    {D.QUERY} TMDB: Searching for '{title}' ({year or 'N/A'})...")
     try:
-        data = await _imdb_get_json(session, search_url)
-
-        results = data.get("titles", []) if isinstance(data, dict) else data if isinstance(data, list) else []
+        params = {"query": title}
+        if year:
+            params["primary_release_year"] = year
+        data = await _tmdb_get_json(session, "/search/movie", **params)
+        results = (data or {}).get("results") or []
+        if not results and year:  # year too strict? retry without it
+            data = await _tmdb_get_json(session, "/search/movie", query=title)
+            results = (data or {}).get("results") or []
         if not results:
             return None
-
-        # Filter: prefer year match + type=="movie"
-        candidates = results
-        if year:
-            year_matches = [m for m in candidates if str(m.get("startYear", "")) == str(year)]
-            if year_matches:
-                candidates = year_matches
-
-        movie_matches = [m for m in candidates if m.get("type") == "movie"]
-        best = movie_matches[0] if movie_matches else (candidates[0] if candidates else None)
-        if not best or not best.get("id"):
-            return None
-
-        return await fetch_imdb_detail(session, best["id"], log)
+        return await _fetch_tmdb_movie(session, results[0]["id"], log)
     except Exception as e:
-        log(f"    {D.ERROR} IMDb: Error querying: {e}")
+        log(f"    {D.ERROR} TMDB: Error querying: {e}")
         return None
 
 
@@ -210,14 +248,14 @@ async def _wikidata_qids_fulltext(session, query: str) -> List[str]:
     word (e.g. 'Ferdinand'), which a label-only search misses."""
     url = (f"{_WIKIDATA_API}?action=query&list=search&format=json&srlimit=7"
            f"&srsearch={urllib.parse.quote(query)}")
-    data = await _imdb_get_json(session, url, headers=_WIKIDATA_HEADERS)
+    data = await _get_json_retry(session, url, headers=_WIKIDATA_HEADERS)
     return [r["title"] for r in data.get("query", {}).get("search", []) if r.get("title")]
 
 
 async def _wikidata_qids_label(session, title: str) -> List[str]:
     url = (f"{_WIKIDATA_API}?action=wbsearchentities&search={urllib.parse.quote(title)}"
            "&language=en&type=item&limit=7&format=json")
-    data = await _imdb_get_json(session, url, headers=_WIKIDATA_HEADERS)
+    data = await _get_json_retry(session, url, headers=_WIKIDATA_HEADERS)
     return [r["id"] for r in data.get("search", []) if r.get("id")]
 
 
@@ -227,7 +265,7 @@ async def _wikidata_pick_film(session, qids: List[str], year: Optional[str]) -> 
     if not qids:
         return None
     url = f"{_WIKIDATA_API}?action=wbgetentities&ids={'|'.join(qids)}&props=claims&format=json"
-    entities = (await _imdb_get_json(session, url, headers=_WIKIDATA_HEADERS)).get("entities", {})
+    entities = (await _get_json_retry(session, url, headers=_WIKIDATA_HEADERS)).get("entities", {})
 
     def imdb_of(claims):
         c = claims.get("P345")

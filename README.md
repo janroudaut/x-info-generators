@@ -30,6 +30,20 @@ This installs two commands: [🎬 **`gen-video-info`**](#-gen-video-info) and [�
 
 Handles **movies and TV series**, deciding what each video *is* from its **content**, never from the folder name (a directory is just an organizational placeholder — `old`, `films 2024`, a "collection"…).
 
+> **Setup**: movie metadata comes from [TMDB](https://www.themoviedb.org/), which requires a **free API key**:
+>
+> 1. Create an account at <https://www.themoviedb.org/signup> and confirm the verification email.
+> 2. Go to **Settings → API** (<https://www.themoviedb.org/settings/api>) and click **Create** under "Request an API Key", choosing the **Developer** type.
+> 3. Accept the terms and fill in the short form (application type: *personal use*; a name, a short summary and any URL — your fork of this repo is fine).
+> 4. The key is issued instantly on the same page. Export the **API Key** (v3) — or the longer **API Read Access Token** (v4), both work — as `TMDB_API_KEY`:
+>
+> ```bash
+> export TMDB_API_KEY="your_key_here"   # e.g. in ~/.bashrc, or a sourced ~/.env
+> ```
+>
+> or pass it per invocation with `--tmdb-api-key KEY` (overrides the environment variable).
+> Without a key, series pages still work (TVmaze needs no key) but movie pages are reduced to filename + Rotten Tomatoes/Wikipedia/YouTube data.
+
 - **Movies** → one `{filename}.html` next to the video.
 - **TV series** → episodes (`SxxExx`, in `Season N` subfolders or loose at the root) are grouped into **one series page**, plus **one page per season** that lives in its own folder. Owned episodes are marked (`✓`); the page lists the full season from the metadata source.
 - **Collections** (a folder of several unrelated movies) → one page **per movie**; the folder name is ignored.
@@ -65,9 +79,9 @@ Each season that lives in its own folder also gets a page listing every episode 
 ### How screenshots are acquired
 
 By default (`--screenshot-source auto`), stills are fetched **online** from
-imdbapi.dev (`/titles/{id}/images` — landscape *still frames*), so a page has real
-screenshots **even when generated from a name alone**, with no local file and no
-FFmpeg. When a title has no online stills, it **falls back to FFmpeg**, which
+TMDB (`/movie|tv/{id}/images` — landscape *backdrops*, textless ones first), so a
+page has real screenshots **even when generated from a name alone**, with no local
+file and no FFmpeg. When a title has no online stills, it **falls back to FFmpeg**, which
 extracts evenly-spaced frames from the local video (the first owned episode for a
 series). Either way the results are cached, so re-runs do no extra work.
 
@@ -169,7 +183,7 @@ gen-video-info --purge-cache --cache-ttl 0             # wipe the cache
 
 Common ones: `.mp4`, `.mkv`, `.avi`, `.mov`, `.webm`, `.ts`, `.mpg`, `.m4v`, `.wmv`, `.flv` — plus a broad set of other containers (`.m2ts`, `.mpeg`, `.vob`, `.3gp`, `.divx`, `.rmvb`, `.mxf`, …). In practice anything **FFmpeg** can read is fine.
 
-[FFmpeg](https://ffmpeg.org/) is **optional** — stills come from imdbapi.dev by
+[FFmpeg](https://ffmpeg.org/) is **optional** — stills come from TMDB by
 default, and FFmpeg is only the local fallback (see
 [How screenshots are acquired](#how-screenshots-are-acquired)). Without it in
 `PATH`, titles lacking online stills simply get no screenshots; everything else
@@ -197,8 +211,8 @@ is still fetched.
 | Source | Data |
 |--------|------|
 | [Wikidata](https://www.wikidata.org/) | Resolves the IMDb id robustly (full-text + label search), avoiding IMDb's flaky search endpoint |
-| [imdbapi.dev](https://imdbapi.dev/) `/titles/{id}` | Title, year, runtime, IMDb rating, plot, poster, directors, cast (with characters & photos), genres |
-| imdbapi.dev `/titles/{id}/images` | Online still frames (the default screenshot source) |
+| [TMDB](https://www.themoviedb.org/) `/movie/{id}` (+credits, via `/find/{imdb_id}`) | Title, year, runtime, TMDB rating, plot, poster, directors, cast (with characters & photos), genres — requires `TMDB_API_KEY` |
+| TMDB `/movie/{id}/images` | Online backdrops (the default screenshot source) |
 | Rotten Tomatoes | Tomatometer + Audience scores (clickable rating badges) |
 | Wikipedia | Summary, page link |
 | YouTube | Official trailer, review/trivia videos with thumbnails |
@@ -209,9 +223,11 @@ is still fetched.
 | Source | Data |
 |--------|------|
 | [TVmaze](https://www.tvmaze.com/api) | Series + all episodes + cast in one call: rating, genres, network, episode runtime, IMDb id, poster, per-season episode list (names, summaries, ratings) |
-| imdbapi.dev | IMDb rating badge + online still frames (via the TVmaze-provided id) |
+| TMDB | Rating badge + online backdrops (via the TVmaze-provided IMDb id) |
 | Rotten Tomatoes (`/tv/`) | Tomatometer + Audience scores |
 | Wikipedia, YouTube, FFmpeg | As for movies (FFmpeg fallback takes frames from the first owned episode) |
+
+This product uses the TMDB API but is not endorsed or certified by [TMDB](https://www.themoviedb.org/).
 </details>
 
 ## Development
@@ -255,7 +271,7 @@ src/x_info_generators/
 └── video/
     ├── cli.py           # gen-video-info entry point
     ├── discovery.py     # content-based classification (movies vs series, collections)
-    ├── fetchers.py      # Wikidata, imdbapi.dev, TVmaze, Rotten Tomatoes, Wikipedia, YouTube, FFmpeg
+    ├── fetchers.py      # Wikidata, TMDB, TVmaze, Rotten Tomatoes, Wikipedia, YouTube, FFmpeg
     └── processing.py    # process_movie_file, process_series
 ```
 </details>

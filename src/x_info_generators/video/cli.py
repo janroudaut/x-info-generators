@@ -1,5 +1,6 @@
 import argparse
 import asyncio
+import os
 import shutil
 import sys
 import time
@@ -21,6 +22,7 @@ from .processing import (
     VIDEO_EXTENSIONS,
 )
 from .discovery import classify_items
+from .fetchers import tmdb_available
 
 USER_AGENT = f"VideoInfoGenerator/{__version__} (Personal, manual use script; +{REPO_URL})"
 
@@ -88,6 +90,14 @@ async def _main_loop(args: argparse.Namespace):
               f"→ {output}")
         return
 
+    if args.tmdb_api_key:
+        # The fetchers read the environment at call time, so exporting here is
+        # all the wiring the flag needs.
+        os.environ["TMDB_API_KEY"] = args.tmdb_api_key
+    if not tmdb_available() and not args.offline:
+        print(f"{D.C_YELLOW}{D.WARNING} TMDB_API_KEY is not set — movie metadata, posters and online stills "
+              f"will be missing (series keep TVmaze data). Get a free key at "
+              f"https://www.themoviedb.org/settings/api and export TMDB_API_KEY.{D.C_RESET}")
     if not shutil.which("ffmpeg"):
         print(f"{D.C_YELLOW}{D.WARNING} ffmpeg not found in PATH — screenshots will be skipped (everything else still works).{D.C_RESET}")
 
@@ -171,9 +181,14 @@ def main():
     groups["generation"].add_argument(
         "--screenshot-source", choices=["auto", "online", "ffmpeg", "off"],
         default="auto", metavar="MODE", dest="screenshot_source",
-        help="Where stills come from: auto (online imdbapi.dev stills, ffmpeg "
-             "fallback) [default], online (imdbapi.dev only), ffmpeg (local file "
+        help="Where stills come from: auto (online TMDB backdrops, ffmpeg "
+             "fallback) [default], online (TMDB only), ffmpeg (local file "
              "only), off (none).")
+    network = parser.add_argument_group("network")
+    network.add_argument(
+        "--tmdb-api-key", metavar="KEY", dest="tmdb_api_key",
+        help="TMDB API key (v3 key or v4 read access token); overrides the "
+             "TMDB_API_KEY environment variable.")
 
     # Bare invocation: show the full help and exit cleanly (onboarding).
     if len(sys.argv) == 1:

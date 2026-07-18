@@ -44,10 +44,6 @@ a.trailer-link:hover { color: #ffc1c1; }
 {% endif %}
 {% endmacro %}
 
-{% macro person_link(person) %}
-<a href="https://www.imdb.com/name/{{ person.id }}" target="_blank">{{ person.name }}</a>
-{% endmacro %}
-
 {% block header %}
 <header>
 <h1>{{ data.title }} ({{ data.year | default("N/A") }})</h1>
@@ -70,7 +66,7 @@ a.trailer-link:hover { color: #ffc1c1; }
 <table class="details-table">
 {% if directors_str %}
 <tr><th>Director(s)</th><td>
-{% for d in data.directors %}{{ person_link(d) }}{% if not loop.last %}, {% endif %}{% endfor %}
+{% for d in data.directors %}{{ m.name_link(d) }}{% if not loop.last %}, {% endif %}{% endfor %}
 </td></tr>
 {% endif %}
 {% if data.genres %}<tr><th>Genres</th><td>{{ data.genres | join(", ") }}</td></tr>{% endif %}

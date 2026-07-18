@@ -55,7 +55,7 @@ The package exposes two independent entry points (`gen-game-info`, `gen-video-in
 - `game/processing.py::_merge_data()` handles priority: first non-empty value wins, except `name` and `description_html` prefer the longer string.
 - Images in Steam's `detailed_description` HTML are rewritten to base64 inline by `_download_and_rewrite_embedded_images()`.
 - Screenshots are fetched concurrently via `asyncio.gather` then encoded sequentially.
-- Video stills: `video/processing.py::_resolve_screenshots()` picks the source per `--screenshot-source` — online imdbapi.dev stills (`fetch_imdb_stills`) first, then ffmpeg on the local file as fallback (`auto`). `online`/`ffmpeg`/`off` force the behaviour. Online stills work without a local file (name-only generation).
+- Video stills: `video/processing.py::_resolve_screenshots()` picks the source per `--screenshot-source` — online TMDB backdrops (`fetch_tmdb_stills`) first, then ffmpeg on the local file as fallback (`auto`). `online`/`ffmpeg`/`off` force the behaviour. Online stills work without a local file (name-only generation).
 
 ### External APIs
 
@@ -65,7 +65,7 @@ The package exposes two independent entry points (`gen-game-info`, `gen-video-in
 | Metacritic | HTML scraping of `/game/{slug}/` (score via JSON-LD) |
 | MobyGames | HTML scraping of search results then game page |
 | Wikidata | Resolves a movie's IMDb id (CirrusSearch full-text + label search) |
-| imdbapi.dev | `api.imdbapi.dev/titles/{id}` (+ `/credits`, `/images`) for movies (note: `api.imdbapi.dev`, not `imdbapi.dev`). `/images` provides online stills (`still_frame`, landscape) — the default screenshot source |
+| TMDB | `api.themoviedb.org/3` — `/find/{imdb_id}` maps the Wikidata-resolved IMDb id, then `/movie/{id}?append_to_response=credits` (metadata + cast) and `/movie|tv/{id}/images` (backdrops = the default screenshot source). **Requires `TMDB_API_KEY`** (v3 key or v4 Bearer token, auto-detected; `--tmdb-api-key` overrides the env var by exporting it); without it movie pages are partial |
 | TVmaze | Series + all episodes + cast in one `singlesearch` call |
 | Rotten Tomatoes | Slug `m/{slug}` (movies) or `/tv/{slug}` (series) resolved by a direct GET — no Google scraping |
 | Wikipedia | `wikipedia` Python library (sync, run in executor) |
