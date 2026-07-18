@@ -114,7 +114,7 @@ A full game page — description, details, Metacritic + Steam reviews, links and
 
 ## 🗂️ Catalog (`--index`)
 
-`--index` builds a single, browsable **catalog** from the pages **already generated** on disk — no generation, no network. It scans the given paths for generated `.html`, reads each page (title, type, year, ratings, poster) and writes a self-contained catalog file (`00_INDEX.html` by default) with client-side **search, filter and sort**. The video catalog is the page at the top of this README; here's a games one:
+`--index` builds a single, browsable **catalog** from the pages **already generated** on disk — no generation, no network. It scans the given paths for generated `.html`, reads each page (title, type, year, ratings, poster) and writes a self-contained catalog file (`00_INDEX.html` by default) with client-side **search, type & genre filters and sort**. The video catalog is the page at the top of this README; here's a games one:
 
 <p align="center">
   <img src="assets/screenshots/catalog-games.png" width="760" alt="A games catalog">
@@ -228,6 +228,76 @@ is still fetched.
 | Wikipedia, YouTube, FFmpeg | As for movies (FFmpeg fallback takes frames from the first owned episode) |
 
 This product uses the TMDB API but is not endorsed or certified by [TMDB](https://www.themoviedb.org/).
+</details>
+
+### Acquisition flow
+
+Every fetch below goes through the [on-disk cache](#caching) first — a re-run only hits the network for missing entries.
+
+<details>
+<summary>🎬 Movies</summary>
+
+```mermaid
+flowchart TD
+    F["🎞️ movie file<br><i>New-york 1997 (1981).mkv</i>"] -- "clean filename" --> T["title + year"]
+    T --> WD["<b>Wikidata</b><br>full-text + label search<br>→ IMDb id"]
+    WD -- "IMDb id" --> FIND["<b>TMDB</b> /find/{imdb_id}"]
+    WD -- "no id" --> SEARCH["<b>TMDB</b> /search/movie"]
+    FIND --> DETAIL["<b>TMDB</b> /movie/{id} + credits<br>title, year, rating, plot, poster,<br>directors, cast, genres, runtime"]
+    SEARCH --> DETAIL
+    DETAIL -- "TMDB unavailable,<br>id known → partial page" --> PAR
+    DETAIL --> PAR{{"parallel fetches"}}
+    PAR --> RT["<b>Rotten Tomatoes</b><br>direct slug m/{slug}<br>🍅 + 🍿 scores"]
+    PAR --> WP["<b>Wikipedia</b><br>summary + link"]
+    PAR --> YT["<b>YouTube</b><br>trailer + review videos"]
+    PAR --> ST["stills: <b>TMDB</b> backdrops<br>fallback: <b>ffmpeg</b> on local file"]
+    RT --> HTML["📄 one self-contained .html<br>(all images inlined as base64 WebP)"]
+    WP --> HTML
+    YT --> HTML
+    ST --> HTML
+```
+</details>
+
+<details>
+<summary>📺 TV series</summary>
+
+```mermaid
+flowchart TD
+    F["📺 episode files<br><i>Show S01E03.mkv, …</i>"] -- "discovery: SxxExx grouping" --> T["series title<br>+ owned episodes map"]
+    T --> TV["<b>TVmaze</b> singlesearch (one call)<br>show, rating, genres, network,<br><b>all</b> episodes, cast, IMDb id, poster"]
+    TV -- "not found → skipped" --> SKIP["🤷"]
+    TV --> PAR{{"parallel fetches"}}
+    PAR --> RATE["<b>TMDB</b> /find via IMDb id<br>rating badge"]
+    PAR --> RT["<b>Rotten Tomatoes</b><br>direct slug tv/{slug}"]
+    PAR --> WP["<b>Wikipedia</b><br>summary + link"]
+    PAR --> YT["<b>YouTube</b><br>trailer + review videos"]
+    PAR --> ST["stills: <b>TMDB</b> backdrops<br>fallback: <b>ffmpeg</b> on first owned episode"]
+    RATE --> HTML["📄 series page<br>+ one page per season folder<br>(owned episodes marked ✓)"]
+    RT --> HTML
+    WP --> HTML
+    YT --> HTML
+    ST --> HTML
+```
+</details>
+
+<details>
+<summary>🎮 Games</summary>
+
+```mermaid
+flowchart TD
+    D["📁 game folder name"] -- "clean name" --> T["title"]
+    T --> STEAM["<b>Steam</b> storesearch → appdetails<br>name, description, header image,<br>screenshots, genres, release, devs"]
+    STEAM -- "canonical name" --> PAR{{"parallel fetches"}}
+    PAR --> MC["<b>Metacritic</b><br>score via JSON-LD"]
+    PAR --> WP["<b>Wikipedia</b><br>summary + link"]
+    PAR --> MG["<b>MobyGames</b><br>extra description"]
+    PAR --> SR["<b>Steam reviews</b><br>(when an app id was found)"]
+    MC --> MERGE["merge<br>first non-empty value wins;<br>name & description prefer the longer"]
+    WP --> MERGE
+    MG --> MERGE
+    SR --> MERGE
+    MERGE --> HTML["📄 00_GAME_INFO.html<br>(all images inlined as base64 WebP)"]
+```
 </details>
 
 ## Development
