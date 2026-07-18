@@ -273,9 +273,9 @@ def build_catalog(roots, output_path, log: Callable, max_depth: int = 5,
             skipped += 1
             continue
         rec["href"] = _href(out_dir, f, wsl)
-        # Directories under the scanned root, so the search box also matches
-        # folder names (e.g. a "007" collection folder) without the noise of
-        # the absolute path. Videos only — game folders just repeat the title.
+        # Root-relative directories for the search box — videos only. Years are
+        # stripped so folder names never leak into text search (that goes
+        # through data-year).
         rec["search_path"] = ""
         if rec["kind"] != "game":
             try:
@@ -283,7 +283,9 @@ def build_catalog(roots, output_path, log: Callable, max_depth: int = 5,
             except ValueError:
                 rel_dir = f.parent.name
             if rel_dir != ".":
-                rec["search_path"] = rel_dir.lower()
+                path = re.sub(r"\b(19|20)\d{2}\b", " ", rel_dir.lower())
+                path = re.sub(r"[(\[]\s*[-–]?\s*[)\]]", " ", path)
+                rec["search_path"] = re.sub(r"\s+", " ", path).strip()
         rec["sort_score"] = _sort_score(rec["ratings"])
         entries.append(rec)
         by_kind[rec["kind"]] += 1

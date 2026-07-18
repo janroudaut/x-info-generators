@@ -3,6 +3,24 @@
 All notable changes to this project are documented here.
 This project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.5.1] — 2026-07-18
+
+### Added
+- **Catalog search: quoted phrases** — `"daniel craig"` matches the exact
+  phrase instead of AND-ing the words (an unclosed quote degrades to a plain
+  word search).
+
+### Changed
+- **Catalog search: smarter year matching** — a term starting with 19/20 and
+  at least 3 digits long is treated as a year and matches by prefix ("197"
+  lists the whole 1970s); any other term (e.g. "007") no longer matches the
+  year, only titles/folders/people. Years are also stripped from the indexed
+  folder paths, so a "(2007)" in a folder name can't leak into text search.
+
+### Fixed
+- Catalog cards showed a literal "None" after the year for items without a
+  runtime (games, since the runtime line landed in 1.2.2).
+
 ## [1.5.0] — 2026-07-18
 
 ### Added

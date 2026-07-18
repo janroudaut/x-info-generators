@@ -84,7 +84,7 @@ footer { text-align: center; margin-top: 30px; padding-top: 15px; border-top: 1p
 </div>
 <div class="meta">
 <div class="title">{{ e.title }}</div>
-{% if e.year or e.runtime %}<div class="year">{{ e.year }}{% if e.year and e.runtime %} &middot; {% endif %}{{ e.runtime }}</div>{% endif %}
+{% if e.year or e.runtime %}<div class="year">{{ e.year or "" }}{% if e.year and e.runtime %} &middot; {% endif %}{{ e.runtime or "" }}</div>{% endif %}
 <div class="badges">
 {% if 'tmdb' in e.ratings %}<span class="badge">TMDB <span class="score {{ e.ratings.tmdb | score_color_class }}">{{ e.ratings.tmdb }}</span></span>{% endif %}
 {% if 'imdb' in e.ratings %}<span class="badge">IMDb <span class="score {{ e.ratings.imdb | score_color_class }}">{{ e.ratings.imdb }}</span></span>{% endif %}
@@ -123,18 +123,29 @@ footer { text-align: center; margin-top: 30px; padding-top: 15px; border-top: 1p
   }
 
   function apply() {
-    var terms = search.value.trim().toLowerCase().split(/\s+/).filter(Boolean);
+    // Tokenize: "quoted phrases" stay whole ('"daniel craig"' won't match a
+    // Daniel plus an unrelated Craig); bare words are separate AND-terms.
+    var terms = [];
+    search.value.trim().toLowerCase().replace(/"([^"]*)"|(\S+)/g, function(_, quoted, word) {
+      var t = (quoted !== undefined ? quoted : word.replace(/"/g, "")).trim();
+      if (t) terms.push(t);
+      return "";
+    });
     var t = typeSel ? typeSel.value : "all";
     var g = genreSel ? genreSel.value : "all";
     var visible = 0;
     cards.forEach(function(c) {
       var okType = (t === "all") || (c.dataset.kind === t);
       var okGenre = (g === "all") || ("|" + c.dataset.genres + "|").indexOf("|" + g + "|") !== -1;
-      var hay = c.dataset.title + " " + c.dataset.path + " " +
-                c.dataset.people + " " + c.dataset.year;
+      var hay = c.dataset.title + " " + c.dataset.path + " " + c.dataset.people;
       // Every whitespace-separated term must match somewhere ("keanu 1999"
-      // = Keanu Reeves movies from 1999).
-      var okText = terms.every(function(term) { return hay.indexOf(term) !== -1; });
+      // = Keanu Reeves movies from 1999). A year-looking term (19/20 + at
+      // least 3 digits) matches the year by prefix — "197" covers the 70s —
+      // while plain text like "007" never matches the year.
+      var okText = terms.every(function(term) {
+        if (/^(19|20)\d{1,2}$/.test(term) && c.dataset.year.indexOf(term) === 0) return true;
+        return hay.indexOf(term) !== -1;
+      });
       var show = okType && okGenre && okText;
       c.style.display = show ? "" : "none";
       if (show) visible++;
