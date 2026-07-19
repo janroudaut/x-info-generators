@@ -20,6 +20,7 @@
 a.trailer-link { font-weight: bold; font-size: 1.1em; color: #ff8a8a; }
 a.trailer-link:hover { color: #ffc1c1; }
 .details-table th { width: 120px; }
+.track { display: inline-block; margin-right: 14px; white-space: nowrap; }
 @media (max-width: 768px) {
   .content-section, .screenshots-section, .videos-section, .cast-section { padding: 15px; margin-bottom: 18px; }
   .videos-container { grid-template-columns: repeat(auto-fill, minmax(min(200px, 100%), 1fr)); gap: 10px; }
@@ -72,6 +73,14 @@ a.trailer-link:hover { color: #ffc1c1; }
 {% if data.genres %}<tr><th>Genres</th><td>{{ data.genres | join(", ") }}</td></tr>{% endif %}
 {% if data.year %}<tr><th>Year</th><td>{{ data.year }}</td></tr>{% endif %}
 {% if data.runtime_seconds %}<tr><th>Runtime</th><td>{{ data.runtime_seconds | format_duration }}</td></tr>{% endif %}
+{% if data.media_info %}
+{% set mi = data.media_info %}
+{% if mi.video %}<tr><th>Resolution</th><td>{{ mi.video.width }}×{{ mi.video.height }}{% if mi.video.label %} ({{ mi.video.label }}){% endif %}{% if mi.video.codec %} &middot; {{ mi.video.codec }}{% endif %}</td></tr>{% endif %}
+{% if mi.audio %}<tr><th>Audio</th><td data-audio-langs="{{ mi.audio | map(attribute='lang') | unique | join('|') }}">
+{% for a in mi.audio %}<span class="track">{{ a.lang | lang_flag }}{% set alabel = a.title or ("" if a.lang == "und" else a.lang) %}{% if alabel %} {{ alabel }}{% endif %}{% if a.codec %} &middot; {{ a.codec }}{% endif %}{% if a.channels %} {{ a.channels }}{% endif %}{% if a.count and a.count > 1 %} ×{{ a.count }}{% endif %}</span>{% endfor %}</td></tr>{% endif %}
+{% if mi.subtitles %}<tr><th>Subtitles</th><td data-subtitle-langs="{{ mi.subtitles | map(attribute='lang') | unique | join('|') }}">
+{% for s in mi.subtitles %}<span class="track">{{ s.lang | lang_flag }}{% set slabel = s.title or ("" if s.lang == "und" else s.lang) %}{% if slabel %} {{ slabel }}{% endif %}{% if s.count and s.count > 1 %} ×{{ s.count }}{% endif %}</span>{% endfor %}</td></tr>{% endif %}
+{% endif %}
 {% if data.cast %}<tr><td colspan="2">{{ m.cast_list(data.cast) }}</td></tr>{% endif %}
 </table>
 {% endif %}

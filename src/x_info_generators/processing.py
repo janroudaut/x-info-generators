@@ -1,6 +1,6 @@
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import List, Dict, Callable
+from typing import List, Dict, Callable, Optional
 
 from .display import DisplayMode as D
 from .utils import format_bytes
@@ -13,6 +13,19 @@ class ItemStats:
     duration_s: float = 0.0
     failed_sources: List[str] = field(default_factory=list)
     sources_summary: Dict[str, str] = field(default_factory=dict)
+    title: Optional[str] = None  # resolved display title ("The Abyss (1989)")
+
+
+STATUS_EMOJI = {"SUCCESS": "📄", "SKIPPED": "⏩", "INSUFFICIENT_DATA": "🤷", "ERROR": "❌"}
+
+
+def format_item_status(stats: ItemStats) -> str:
+    """One-line per-item summary: resolved title, status, duration, size."""
+    title = f"{stats.title} | " if stats.title else ""
+    emoji = STATUS_EMOJI.get(stats.status, "")
+    emoji = f"{emoji} " if D.STATS and emoji else ""
+    return (f"  {D.STATS} {title}{emoji}{stats.status} | "
+            f"{D.CLOCK} {stats.duration_s:.2f}s | {format_bytes(stats.size_bytes)}")
 
 
 @dataclass

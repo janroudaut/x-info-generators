@@ -18,7 +18,7 @@ from .. import __version__
 from .fetchers import (
     fetch_tmdb_search, fetch_tmdb_detail, fetch_tmdb_rating, fetch_tmdb_stills,
     resolve_imdb_id_wikidata,
-    generate_screenshots_async,
+    generate_screenshots_async, probe_media_info,
     fetch_rotten_tomatoes_data, fetch_wikipedia_data,
     fetch_youtube_trailer, fetch_youtube_reviews,
     fetch_tvmaze_series,
@@ -113,6 +113,64 @@ async def _cached_screenshots(cache, movie_path: Path, temp_dir: Path, max_scree
     return sources
 
 
+def _prepare_media_info(info: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+    """Display prep, applied outside the cache (so older cached probes get it
+    too): identical tracks are collapsed into one entry with a count."""
+    if not info:
+        return info
+    for kind in ("audio", "subtitles"):
+        grouped: Dict[tuple, Dict[str, Any]] = {}
+        for t in info.get(kind) or []:
+            key = (t.get("lang"), t.get("title"), t.get("codec"), t.get("channels"))
+            if key in grouped:
+                grouped[key]["count"] += 1
+            else:
+                grouped[key] = {**t, "count": 1}
+        info[kind] = list(grouped.values())
+    return info
+
+
+async def _cached_media_info(cache, path: Path, log: Callable) -> Optional[Dict[str, Any]]:
+    """ffprobe result (resolution + audio/subtitle tracks), cached by path+mtime."""
+    try:
+        mtime = path.stat().st_mtime
+    except OSError:
+        mtime = 0
+    key = f"{path}|{mtime}"
+    hit, value = cache.get("media-info", key)
+    if hit:
+        return _prepare_media_info(value)
+    if cache.offline:
+        return None
+    value = await probe_media_info(path, log)
+    cache.set("media-info", key, value)
+    return _prepare_media_info(value)
+
+
+def _uniq(seq):
+    seen = set()
+    return [x for x in seq if not (x in seen or seen.add(x))]
+
+
+_RES_ORDER = ["SD", "720p", "1080p", "1440p", "2160p"]
+
+
+def _aggregate_media_info(infos) -> Optional[Dict[str, Any]]:
+    """Union of per-episode media info for the series-level summary."""
+    infos = [i for i in infos if i]
+    if not infos:
+        return None
+    audio = _uniq(a["lang"] for i in infos for a in i.get("audio") or [])
+    subs = _uniq(s["lang"] for i in infos for s in i.get("subtitles") or [])
+    labels = _uniq((i.get("video") or {}).get("label") for i in infos)
+    labels = sorted((l for l in labels if l),
+                    key=lambda l: _RES_ORDER.index(l) if l in _RES_ORDER else -1)
+    resolution = None
+    if labels:
+        resolution = labels[0] if len(labels) == 1 else f"{labels[0]}–{labels[-1]}"
+    return {"resolution": resolution, "audio_langs": audio, "sub_langs": subs}
+
+
 async def _resolve_screenshots(
     strategy: str, cache, session: aiohttp.ClientSession, imdb_id: Optional[str],
     video_path: Optional[Path], temp_dir: Path, n: int, log: Callable,
@@ -193,6 +251,7 @@ async def process_movie_file(
 
         title = aggregated_data["title"]
         movie_year = aggregated_data.get("year")
+        stats.title = f"{title} ({movie_year})" if movie_year else title
         meta_key = f"{title}|{movie_year or ''}"
 
         # Build parallel tasks (cached metadata fetches + image work)
@@ -208,6 +267,7 @@ async def process_movie_file(
             "screenshots": _resolve_screenshots(screenshot_source, cache, session,
                                                 aggregated_data.get("imdb_id"), movie_path,
                                                 temp_dir, max_screenshots, log),
+            "media_info": _cached_media_info(cache, movie_path, log),
         }
         if aggregated_data.get("poster_url"):
             tasks["poster"] = cached_image_data_uri(session, aggregated_data["poster_url"], cache, temp_dir, log, "Poster")
@@ -223,8 +283,9 @@ async def process_movie_file(
                     log(f"    {D.ERROR} Task '{source_name}' failed: {data}")
                 continue
             if not data:
-                # Empty stills/poster aren't a "failed source" (e.g. --screenshot-source off).
-                if source_name not in ("screenshots", "poster"):
+                # Empty stills/poster/media info aren't a "failed source"
+                # (e.g. --screenshot-source off, name-only generation).
+                if source_name not in ("screenshots", "poster", "media_info"):
                     stats.failed_sources.append(source_name)
                 continue
 
@@ -234,6 +295,8 @@ async def process_movie_file(
                 aggregated_data["poster_src"] = data
             elif source_name == "screenshots":
                 aggregated_data["screenshot_sources"] = data
+            elif source_name == "media_info":
+                aggregated_data["media_info"] = data
 
         # Embed YouTube thumbnails and actor photos as base64 (via disk cache)
         await _embed_youtube_thumbnails(aggregated_data, session, cache, temp_dir, log)
@@ -304,21 +367,33 @@ async def _embed_youtube_thumbnails(data, session, cache, temp_dir, log):
                 reviews[i]["thumbnail_url"] = data_uri
 
 
-def _build_seasons_view(item, imdb_episodes: Dict[int, list], owned: set) -> list:
+def _build_seasons_view(item, imdb_episodes: Dict[int, list], owned: set,
+                        ep_media: Optional[Dict] = None) -> list:
     """Build the per-season episode listing for the templates.
 
-    Uses the IMDb episode list when available (marking which episodes the user
-    owns); falls back to the locally-present episodes otherwise.
+    Uses the metadata episode list when available (marking which episodes the
+    user owns); falls back to the locally-present episodes otherwise. Owned
+    episodes get their probed audio/subtitle languages attached.
     """
+
+    def tracks(season, number):
+        info = (ep_media or {}).get((season, number))
+        if not info:
+            return {}
+        return {"audio_langs": _uniq(a["lang"] for a in info.get("audio") or []),
+                "sub_langs": _uniq(s["lang"] for s in info.get("subtitles") or [])}
+
     seasons_view = []
     for sg in item.seasons:
         imdb_eps = imdb_episodes.get(sg.number)
         if imdb_eps:
-            episodes = [{**e, "owned": (sg.number, e["number"]) in owned} for e in imdb_eps]
+            episodes = [{**e, "owned": (sg.number, e["number"]) in owned,
+                         **tracks(sg.number, e["number"])} for e in imdb_eps]
         else:
             episodes = [
                 {"number": ep.number, "title": f"Episode {ep.number}",
-                 "plot": None, "rating": None, "owned": True}
+                 "plot": None, "rating": None, "owned": True,
+                 **tracks(sg.number, ep.number)}
                 for ep in sg.episodes
             ]
         page_link = None
@@ -363,6 +438,7 @@ async def process_series(
 
         # JSON (the disk cache) turns dict keys into strings, so a cached run has
         # str season keys while a fresh fetch has int — normalize to int either way.
+        stats.title = f"{meta['title']} ({meta['year']})" if meta.get("year") else meta["title"]
         episodes_by_season = {int(k): v for k, v in (meta.get("episodes_by_season") or {}).items()}
         owned = item.owned_episodes()
         meta_key = f"{meta['title']}|{meta.get('year') or ''}"
@@ -414,7 +490,20 @@ async def process_series(
         await _embed_youtube_thumbnails(data, session, cache, temp_dir, log)
         await _embed_cast_images(data, session, cache, temp_dir, log)
 
-        seasons_view = _build_seasons_view(item, episodes_by_season, owned)
+        # Tracks are per episode, so probe every owned file (quietly — cached
+        # by path+mtime); the series page shows the union.
+        ep_paths = {(sg.number, ep.number): ep.path
+                    for sg in item.seasons for ep in sg.episodes}
+        quiet = lambda *_: None
+        probes = await asyncio.gather(
+            *(_cached_media_info(cache, p, quiet) for p in ep_paths.values())
+        ) if ep_paths else []
+        ep_media = {k: v for k, v in zip(ep_paths, probes) if v}
+        if ep_media:
+            log(f"    {D.SUCCESS_DATA} ffprobe: media info for {len(ep_media)}/{len(ep_paths)} episode(s)")
+            data["media_summary"] = _aggregate_media_info(ep_media.values())
+
+        seasons_view = _build_seasons_view(item, episodes_by_season, owned, ep_media)
         data["seasons"] = seasons_view
         data["owned_episode_count"] = len(owned)
         data["total_seasons"] = len(episodes_by_season) or len(seasons_view)

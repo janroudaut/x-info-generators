@@ -67,3 +67,73 @@ def encode_image_to_base64_data_uri(image_path: Path) -> Optional[str]:
 async def run_in_executor(func, *args):
     loop = asyncio.get_event_loop()
     return await loop.run_in_executor(None, func, *args)
+
+
+# ISO 639 languages: canonical 639-2/B code, its aliases (639-2/T, 639-1),
+# and the emoji flag.
+_LANGS = [
+    ("eng", ("en",), "🇬🇧"),
+    ("fre", ("fra", "fr"), "🇫🇷"),
+    ("spa", ("es",), "🇪🇸"),
+    ("ger", ("deu", "de"), "🇩🇪"),
+    ("ita", ("it",), "🇮🇹"),
+    ("por", ("pt",), "🇵🇹"),
+    ("dut", ("nld", "nl"), "🇳🇱"),
+    ("rus", ("ru",), "🇷🇺"),
+    ("jpn", ("ja",), "🇯🇵"),
+    ("kor", ("ko",), "🇰🇷"),
+    ("chi", ("zho", "zh"), "🇨🇳"),
+    ("ara", ("ar",), "🇸🇦"),
+    ("pol", ("pl",), "🇵🇱"),
+    ("swe", ("sv",), "🇸🇪"),
+    ("nor", ("no",), "🇳🇴"),
+    ("dan", ("da",), "🇩🇰"),
+    ("fin", ("fi",), "🇫🇮"),
+    ("cze", ("ces", "cs"), "🇨🇿"),
+    ("hun", ("hu",), "🇭🇺"),
+    ("gre", ("ell", "el"), "🇬🇷"),
+    ("rum", ("ron", "ro"), "🇷🇴"),
+    ("tur", ("tr",), "🇹🇷"),
+    ("heb", ("he",), "🇮🇱"),
+    ("hin", ("hi",), "🇮🇳"),
+    ("tha", ("th",), "🇹🇭"),
+    ("ukr", ("uk",), "🇺🇦"),
+    ("vie", ("vi",), "🇻🇳"),
+    ("ind", ("id",), "🇮🇩"),
+    ("bul", ("bg",), "🇧🇬"),
+    ("est", ("et",), "🇪🇪"),
+    ("hrv", ("hr",), "🇭🇷"),
+    ("ice", ("isl", "is"), "🇮🇸"),
+    ("lit", ("lt",), "🇱🇹"),
+    ("lav", ("lv",), "🇱🇻"),
+    ("may", ("msa", "ms"), "🇲🇾"),
+    ("slo", ("slk", "sk"), "🇸🇰"),
+    ("slv", ("sl",), "🇸🇮"),
+    ("srp", ("sr",), "🇷🇸"),
+    ("tam", ("ta",), "🇮🇳"),
+    ("tel", ("te",), "🇮🇳"),
+    ("ben", ("bn",), "🇧🇩"),
+    ("urd", ("ur",), "🇵🇰"),
+    ("per", ("fas", "fa"), "🇮🇷"),
+]
+_LANG_FLAGS = {}
+_LANG_CANON = {}
+for _canon, _aliases, _flag in _LANGS:
+    for _c in (_canon, *_aliases):
+        _LANG_FLAGS[_c] = _flag
+        _LANG_CANON[_c] = _canon
+
+
+def canon_lang(code: Optional[str]) -> str:
+    """Collapse 639-1/639-2 variants to one canonical code (fr/fra → fre)."""
+    code = (code or "").strip().lower()
+    return _LANG_CANON.get(code, code)
+
+
+def lang_flag(code: Optional[str]) -> str:
+    """Emoji flag for a language code; undetermined tracks get a neutral
+    globe, other unknown codes show as text."""
+    code = (code or "").strip().lower()
+    if code in ("", "und"):
+        return "🌐"
+    return _LANG_FLAGS.get(code, code.upper())

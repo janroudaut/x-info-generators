@@ -13,7 +13,7 @@ from ..cli import (
 )
 from ..cache import FetchCache, default_cache_root, purge_cache
 from ..http import create_session
-from ..processing import RunStats, print_run_summary
+from ..processing import RunStats, print_run_summary, format_item_status
 from ..index import build_catalog
 from ..utils import format_bytes, path_matches_ignore
 from .. import __version__, REPO_URL
@@ -131,7 +131,12 @@ async def _main_loop(args: argparse.Namespace):
     try:
         for i, item in enumerate(items, 1):
             label = "SERIES" if item.kind == "series" else "MOVIE"
-            print(f"\n{D.PROCESS} [{i}/{total_count}] ({label}) {item.title}", end="")
+            # For movies, show the filename — inside a collection folder the
+            # cleaned title can be identical for every file.
+            name = item.title if item.kind == "series" else item.video_path.stem
+            if len(name) > 70:
+                name = name[:69] + "…"
+            print(f"\n{D.PROCESS} [{i}/{total_count}] ({label}) {name}", end="")
             if item.html_path.exists() and not args.force:
                 print(f" {D.C_YELLOW}(SKIPPED){D.C_RESET}")
                 run_stats.record("SKIPPED")
@@ -151,11 +156,7 @@ async def _main_loop(args: argparse.Namespace):
 
             run_stats.record(item_stats.status, item_stats.size_bytes)
 
-            print(
-                f"  {D.STATS} Status: {item_stats.status} | "
-                f"{D.CLOCK} Duration: {item_stats.duration_s:.2f}s | "
-                f"Size: {format_bytes(item_stats.size_bytes)}"
-            )
+            print(format_item_status(item_stats))
             if item_stats.failed_sources:
                 print(f"    {D.C_YELLOW}{D.WARNING} No data from: {', '.join(item_stats.failed_sources)}{D.C_RESET}")
     finally:

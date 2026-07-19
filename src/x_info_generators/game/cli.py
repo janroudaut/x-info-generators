@@ -11,7 +11,7 @@ from ..cli import (
 )
 from ..cache import FetchCache, default_cache_root, purge_cache
 from ..http import create_session
-from ..processing import RunStats, print_run_summary, cleanup_html_files
+from ..processing import RunStats, print_run_summary, cleanup_html_files, format_item_status
 from ..index import build_catalog
 from ..utils import format_bytes
 from .. import __version__, REPO_URL
@@ -94,12 +94,7 @@ async def _main_loop(args: argparse.Namespace):
 
             run_stats.record(item_stats.status, item_stats.size_bytes)
 
-            status_emoji = {"SUCCESS": D.SUCCESS_HTML, "INSUFFICIENT_DATA": D.SHRUG, "ERROR": D.ERROR}
-            print(
-                f"  {D.STATS} Status: {status_emoji.get(item_stats.status, '')} {item_stats.status} | "
-                f"{D.CLOCK} Duration: {item_stats.duration_s:.2f}s | "
-                f"Size: {format_bytes(item_stats.size_bytes)}"
-            )
+            print(format_item_status(item_stats))
             for source, summary in item_stats.sources_summary.items():
                 print(f"    {D.SUCCESS_DATA} {source}: {summary}")
             if item_stats.failed_sources:

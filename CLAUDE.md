@@ -70,7 +70,7 @@ The package exposes two independent entry points (`gen-game-info`, `gen-video-in
 | Rotten Tomatoes | Slug `m/{slug}` (movies) or `/tv/{slug}` (series) resolved by a direct GET — no Google scraping |
 | Wikipedia | `wikipedia` Python library (sync, run in executor) |
 | YouTube | Scraping `ytInitialData` JSON from search results page |
-| FFmpeg | `ffmpeg-python` for screenshot extraction — now the **fallback** when a title has no online stills (`--screenshot-source` controls this; optional, skipped with a warning if not in PATH) |
+| FFmpeg | `ffmpeg-python` for screenshot extraction — now the **fallback** when a title has no online stills (`--screenshot-source` controls this; optional, skipped with a warning if not in PATH). `ffprobe` also fills the file-details section (resolution, audio/subtitle tracks with flags via `utils.lang_flag`; per-episode for series, union in the series details) |
 
 ### Template inheritance
 

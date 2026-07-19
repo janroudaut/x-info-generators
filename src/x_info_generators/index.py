@@ -27,6 +27,7 @@ from tqdm import tqdm
 
 from .display import DisplayMode as D
 from .images import downscale_data_uri
+from .utils import canon_lang
 from .templates import render_template
 from . import __version__
 
@@ -153,8 +154,38 @@ def parse_page(html_path: Path) -> Optional[Dict]:
         seen = set()
         people = [p for p in people if not (p.lower() in seen or seen.add(p.lower()))]
 
+    def _langs(attr):
+        el = soup.select_one(f"[{attr}]")
+        vals = (el.get(attr) or "").split("|") if el else []
+        return list(dict.fromkeys(canon_lang(v) for v in vals if v))
+
+    # Best above-stereo channel layout ("2.1", "5.1", "7.1") from the audio
+    # tracks' text.
+    channels = None
+    audio_td = soup.select_one("[data-audio-langs]")
+    if audio_td:
+        layouts = re.findall(r"\b\d\.\d\b", audio_td.get_text(" "))
+        best = max(layouts, key=float, default=None)
+        if best and float(best) > 2.0:
+            channels = best
+
+    # Resolution label from the Resolution row ("1920×816 (1080p) · H264";
+    # series may hold a range — keep the highest). 2160p reads better as 4K.
+    res_label = None
+    rrow = rows.get("resolution")
+    if rrow:
+        ranking = ["SD", "720p", "1080p", "1440p", "2160p"]
+        found = [l for l in re.findall(r"\b(?:2160p|1440p|1080p|720p|SD)\b", rrow)]
+        if found:
+            res_label = max(found, key=ranking.index)
+            res_label = "4K" if res_label == "2160p" else res_label
+
     return {
         "people": people,
+        "audio_langs": _langs("data-audio-langs"),
+        "sub_langs": _langs("data-subtitle-langs"),
+        "channels": channels,
+        "res_label": res_label,
         "kind": kind,
         "title": title,
         "year": year,
@@ -319,6 +350,12 @@ def build_catalog(roots, output_path, log: Callable, max_depth: int = 5,
     all_genres = [{"value": k, "label": genre_display[k], "count": genre_counts[k]}
                   for k in sorted(genre_display)]
 
+    lang_counts: Dict[str, int] = {}
+    for e in entries:
+        for lang in e["audio_langs"]:
+            lang_counts[lang] = lang_counts.get(lang, 0) + 1
+    all_audio_langs = [{"value": k, "count": lang_counts[k]} for k in sorted(lang_counts)]
+
     html = render_template(
         "index.html.j2",
         entries=entries,
@@ -326,6 +363,7 @@ def build_catalog(roots, output_path, log: Callable, max_depth: int = 5,
         total=len(entries),
         title=title,
         all_genres=all_genres,
+        all_audio_langs=all_audio_langs,
         show_type_filter=len(present_kinds) > 1,
         generator_name="CatalogIndexGenerator",
         version=__version__,

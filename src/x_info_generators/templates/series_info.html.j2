@@ -27,6 +27,9 @@ a.trailer-link:hover { color: #ffc1c1; }
 .ep-plot { display: block; color: #aaa; font-size: 0.88em; margin-top: 2px; }
 .ep-rating { width: 70px; text-align: right; }
 .ep-rating .score { padding: 2px 6px; font-size: 0.85em; }
+.ep-tracks { white-space: nowrap; text-align: right; font-size: 0.85em; }
+.track { display: inline-block; margin-right: 6px; }
+.track-note { color: #9a9a9a; font-size: 0.85em; }
 {% endblock %}
 
 {% block header %}
@@ -48,6 +51,14 @@ a.trailer-link:hover { color: #ffc1c1; }
 {% if data.year %}<tr><th>Years</th><td>{{ data.year }}{% if data.end_year %}&ndash;{{ data.end_year }}{% endif %}</td></tr>{% endif %}
 {% if data.total_seasons %}<tr><th>Seasons</th><td>{{ data.total_seasons }}</td></tr>{% endif %}
 {% if data.episode_runtime %}<tr><th>Episode length</th><td>~{{ data.episode_runtime }} min</td></tr>{% endif %}
+{% if data.media_summary %}
+{% set ms = data.media_summary %}
+{% if ms.resolution %}<tr><th>Resolution</th><td>{{ ms.resolution }}</td></tr>{% endif %}
+{% if ms.audio_langs %}<tr><th>Audio</th><td data-audio-langs="{{ ms.audio_langs | join('|') }}">
+{% for l in ms.audio_langs %}<span class="track" title="{{ l }}">{{ l | lang_flag }}</span>{% endfor %} <span class="track-note">(across owned episodes)</span></td></tr>{% endif %}
+{% if ms.sub_langs %}<tr><th>Subtitles</th><td data-subtitle-langs="{{ ms.sub_langs | join('|') }}">
+{% for l in ms.sub_langs %}<span class="track" title="{{ l }}">{{ l | lang_flag }}</span>{% endfor %} <span class="track-note">(across owned episodes)</span></td></tr>{% endif %}
+{% endif %}
 {% if data.cast %}<tr><td colspan="2">{{ m.cast_list(data.cast) }}</td></tr>{% endif %}
 </table>
 

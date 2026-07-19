@@ -231,6 +231,7 @@ async def process_game_directory(
 
         # Steam's name re-introduces ™/® symbols, which break Wikipedia/Metacritic.
         current_best_name = sanitize_search_term(aggregated_data.get("name", game_title_cleaned))
+        stats.title = current_best_name
 
         # --- Parallel fetches ---
         fetch_tasks = {

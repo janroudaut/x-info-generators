@@ -24,12 +24,14 @@ header h1 { color: #569cd6; font-size: 2.2em; margin: 0 0 4px; }
 .thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .thumb .noimg { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; color: #555; font-size: 2.5em; }
 .kind { position: absolute; top: 8px; left: 8px; font-size: 0.72em; font-weight: bold; text-transform: uppercase; letter-spacing: 0.04em; padding: 3px 7px; border-radius: 4px; color: #fff; }
+.avmeta { position: absolute; top: 0; right: 0; font-size: 0.72em; font-weight: bold; letter-spacing: 0.04em; padding: 3px 7px; border-radius: 0 0 0 4px; color: #fff; background-color: rgba(0, 0, 0, 0.65); }
 .kind-game { background-color: #6a4caf; }
 .kind-movie { background-color: #2e6da4; }
 .kind-series { background-color: #2e8b57; }
 .meta { padding: 10px; display: flex; flex-direction: column; gap: 6px; flex: 1; }
 .title { font-weight: 600; font-size: 0.95em; line-height: 1.25; }
 .year { color: #9a9a9a; font-size: 0.85em; }
+.tracks { color: #9a9a9a; font-size: 0.85em; }
 .badges { display: flex; flex-wrap: nowrap; gap: 8px; margin-top: auto; padding-top: 6px; }
 .badge { display: inline-flex; align-items: center; gap: 3px; font-size: 0.72em; color: #9a9a9a; white-space: nowrap; }
 .score { font-weight: bold; padding: 1px 5px; border-radius: 3px; color: white; }
@@ -68,6 +70,12 @@ footer { text-align: center; margin-top: 30px; padding-top: 15px; border-top: 1p
 {% for g in all_genres %}<option value="{{ g.value }}">{{ g.label }} ({{ g.count }})</option>
 {% endfor %}</select>
 {% endif %}
+{% if all_audio_langs %}
+<select id="lang">
+<option value="all">All languages</option>
+{% for l in all_audio_langs %}<option value="{{ l.value }}">{{ l.value | lang_flag }} {{ l.value }} ({{ l.count }})</option>
+{% endfor %}</select>
+{% endif %}
 <select id="sort">
 <option value="title">Sort: Title</option>
 <option value="year">Sort: Year</option>
@@ -77,14 +85,16 @@ footer { text-align: center; margin-top: 30px; padding-top: 15px; border-top: 1p
 
 <div class="grid" id="grid">
 {% for e in entries %}
-<a class="card" href="{{ e.href }}" data-kind="{{ e.kind }}" data-title="{{ e.title | lower }}" data-year="{{ e.year or '' }}" data-score="{{ '%.3f' | format(e.sort_score) }}" data-genres="{{ e.genres | join('|') | lower }}" data-path="{{ e.search_path }}" data-people="{{ e.people | join('|') | lower }}">
+<a class="card" href="{{ e.href }}" data-kind="{{ e.kind }}" data-title="{{ e.title | lower }}" data-year="{{ e.year or '' }}" data-score="{{ '%.3f' | format(e.sort_score) }}" data-genres="{{ e.genres | join('|') | lower }}" data-path="{{ e.search_path }}" data-people="{{ e.people | join('|') | lower }}" data-audio="{{ e.audio_langs | join('|') }}">
 <div class="thumb thumb-{{ e.kind }}">
 {% if e.thumb %}<img src="{{ e.thumb }}" alt="" loading="lazy">{% else %}<div class="noimg">{% if e.kind == 'game' %}🎮{% elif e.kind == 'series' %}📺{% else %}🎬{% endif %}</div>{% endif %}
 {% if show_type_filter %}<span class="kind kind-{{ e.kind }}">{{ e.kind }}</span>{% endif %}
+{% if e.res_label or e.channels %}<span class="avmeta">{{ e.res_label or "" }}{% if e.res_label and e.channels %} &middot; {% endif %}{{ e.channels or "" }}</span>{% endif %}
 </div>
 <div class="meta">
 <div class="title">{{ e.title }}</div>
 {% if e.year or e.runtime %}<div class="year">{{ e.year or "" }}{% if e.year and e.runtime %} &middot; {% endif %}{{ e.runtime or "" }}</div>{% endif %}
+{% if e.audio_langs or e.sub_langs %}<div class="tracks">{% if e.audio_langs %}<span title="audio: {{ e.audio_langs | join(', ') }}">🔊{% for l in e.audio_langs %} {{ l | lang_flag }}{% endfor %}</span>{% endif %}{% if e.sub_langs %} <span title="subtitles: {{ e.sub_langs | join(', ') }}">💬 {% if e.sub_langs | length <= 3 %}{% for l in e.sub_langs %}{{ l | lang_flag }}{% if not loop.last %} {% endif %}{% endfor %}{% else %}{{ e.sub_langs | length }}{% endif %}</span>{% endif %}</div>{% endif %}
 <div class="badges">
 {% if 'tmdb' in e.ratings %}<span class="badge">TMDB <span class="score {{ e.ratings.tmdb | score_color_class }}">{{ e.ratings.tmdb }}</span></span>{% endif %}
 {% if 'imdb' in e.ratings %}<span class="badge">IMDb <span class="score {{ e.ratings.imdb | score_color_class }}">{{ e.ratings.imdb }}</span></span>{% endif %}
@@ -106,6 +116,7 @@ footer { text-align: center; margin-top: 30px; padding-top: 15px; border-top: 1p
   var search = document.getElementById("search");
   var typeSel = document.getElementById("type");
   var genreSel = document.getElementById("genre");
+  var langSel = document.getElementById("lang");
   var sortSel = document.getElementById("sort");
   var grid = document.getElementById("grid");
   var empty = document.getElementById("empty");
@@ -133,10 +144,12 @@ footer { text-align: center; margin-top: 30px; padding-top: 15px; border-top: 1p
     });
     var t = typeSel ? typeSel.value : "all";
     var g = genreSel ? genreSel.value : "all";
+    var lg = langSel ? langSel.value : "all";
     var visible = 0;
     cards.forEach(function(c) {
       var okType = (t === "all") || (c.dataset.kind === t);
       var okGenre = (g === "all") || ("|" + c.dataset.genres + "|").indexOf("|" + g + "|") !== -1;
+      var okLang = (lg === "all") || ("|" + c.dataset.audio + "|").indexOf("|" + lg + "|") !== -1;
       var hay = c.dataset.title + " " + c.dataset.path + " " + c.dataset.people;
       // Every whitespace-separated term must match somewhere ("keanu 1999"
       // = Keanu Reeves movies from 1999). A year-looking term (19/20 + at
@@ -146,7 +159,7 @@ footer { text-align: center; margin-top: 30px; padding-top: 15px; border-top: 1p
         if (/^(19|20)\d{1,2}$/.test(term) && c.dataset.year.indexOf(term) === 0) return true;
         return hay.indexOf(term) !== -1;
       });
-      var show = okType && okGenre && okText;
+      var show = okType && okGenre && okLang && okText;
       c.style.display = show ? "" : "none";
       if (show) visible++;
     });
@@ -157,6 +170,7 @@ footer { text-align: center; margin-top: 30px; padding-top: 15px; border-top: 1p
   search.addEventListener("input", apply);
   if (typeSel) typeSel.addEventListener("change", apply);
   if (genreSel) genreSel.addEventListener("change", apply);
+  if (langSel) langSel.addEventListener("change", apply);
   sortSel.addEventListener("change", apply);
 })();
 </script>

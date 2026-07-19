@@ -441,6 +441,58 @@ async def generate_screenshots_async(video_path: Path, temp_dir: Path, num_scree
         return []
 
 
+# --- Media info (ffprobe) ---
+
+_CHANNEL_LAYOUTS = {1: "1.0", 2: "2.0", 3: "2.1", 6: "5.1", 7: "6.1", 8: "7.1"}
+
+
+def _resolution_label(width: Optional[int], height: Optional[int]) -> Optional[str]:
+    # Label by width — scope crops shrink the height (e.g. 1920×816 is 1080p).
+    w = width or 0
+    for min_w, label in ((3200, "2160p"), (2200, "1440p"), (1800, "1080p"), (1000, "720p")):
+        if w >= min_w:
+            return label
+    return "SD" if w else None
+
+
+def _sync_probe_media_info(video_path: Path) -> Optional[Dict[str, Any]]:
+    streams = ffmpeg.probe(str(video_path)).get("streams", [])
+    video, audio, subtitles = None, [], []
+    for s in streams:
+        tags = s.get("tags") or {}
+        lang = (tags.get("language") or "und").lower()
+        kind = s.get("codec_type")
+        if kind == "video" and not video:
+            w, h = s.get("width"), s.get("height")
+            video = {"width": w, "height": h, "label": _resolution_label(w, h),
+                     "codec": (s.get("codec_name") or "").upper() or None}
+        elif kind == "audio":
+            audio.append({"lang": lang, "codec": (s.get("codec_name") or "").upper() or None,
+                          "channels": _CHANNEL_LAYOUTS.get(s.get("channels")),
+                          "title": tags.get("title")})
+        elif kind == "subtitle":
+            subtitles.append({"lang": lang, "title": tags.get("title")})
+    if not (video or audio or subtitles):
+        return None
+    return {"video": video, "audio": audio, "subtitles": subtitles}
+
+
+async def probe_media_info(video_path: Path, log) -> Optional[Dict[str, Any]]:
+    """Resolution + audio/subtitle tracks of the local file, or None (no
+    ffprobe, unreadable file…)."""
+    if not shutil.which("ffprobe"):
+        return None
+    try:
+        info = await run_in_executor(_sync_probe_media_info, video_path)
+        if info:
+            n_a, n_s = len(info["audio"]), len(info["subtitles"])
+            log(f"    {D.SUCCESS_DATA} ffprobe: {info['video']['label'] if info['video'] else '?'}, "
+                f"{n_a} audio, {n_s} subtitle(s)")
+        return info
+    except Exception:
+        return None  # e.g. name-only generation on a stub file
+
+
 # --- Rotten Tomatoes ---
 
 _RT_BROWSER_UA = (

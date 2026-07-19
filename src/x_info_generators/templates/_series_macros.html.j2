@@ -48,6 +48,7 @@
 <td class="ep-mark">{% if e.owned %}✓{% endif %}</td>
 <td class="ep-num">{{ e.number }}</td>
 <td class="ep-title"><span class="ep-name">{{ e.title }}</span>{% if e.plot %}<span class="ep-plot">{{ e.plot }}</span>{% endif %}</td>
+<td class="ep-tracks">{% if e.audio_langs %}{% for l in e.audio_langs %}<span title="audio: {{ l }}">{{ l | lang_flag }}</span>{% endfor %}{% endif %}{% if e.sub_langs %} 💬{% for l in e.sub_langs %}<span title="subtitles: {{ l }}">{{ l | lang_flag }}</span>{% endfor %}{% endif %}</td>
 <td class="ep-rating">{% if e.rating is number %}{{ format_score(e.rating) }}{% endif %}</td>
 </tr>
 {% endfor %}

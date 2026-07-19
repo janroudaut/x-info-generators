@@ -3,6 +3,8 @@ import re
 import jinja2
 from markupsafe import Markup, escape
 
+from .utils import lang_flag
+
 
 def _get_env():
     env = jinja2.Environment(
@@ -14,6 +16,7 @@ def _get_env():
     env.filters["score_color_class"] = score_color_class
     env.filters["linebreaks"] = linebreaks
     env.filters["format_duration"] = format_duration
+    env.filters["lang_flag"] = lang_flag
     return env
 
 

@@ -3,6 +3,32 @@
 All notable changes to this project are documented here.
 This project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.6.0] — 2026-07-19
+
+### Added
+- **File details on video pages** (`ffprobe`): resolution + codec, audio
+  tracks and subtitles with language flags. Tracks belong to episodes, so
+  series/season pages show them per episode line, with a series-level union
+  in the details table. Cached by file path+mtime. Untagged/`und` tracks show
+  a neutral 🌐, and identical unlabeled tracks are collapsed into one entry
+  with a count ("🌐 ×14").
+- **Language flags on catalog cards** (🔊 🇫🇷🇬🇧 💬 🇫🇷), read from the pages'
+  file details — regenerate pages (`--force`) then the catalog to see them.
+- **Audio-language filter in the catalog** (videos) — an "All languages"
+  dropdown with flags and counts; ISO 639 variants (`fr`/`fra`/`fre`) are
+  merged into one entry.
+- **Resolution/audio badge on catalog posters** — top-right corner pill like
+  "4K · 5.1" (resolution label + best channel layout when above stereo).
+  Subtitles on cards show flags up to 3 distinct languages, a count beyond
+  (full list as tooltip); audio flags are spaced.
+
+### Changed
+- **More readable per-item CLI output** — the header shows the movie's
+  filename (inside a collection folder the cleaned title is identical for
+  every file), and the status line leads with the resolved title:
+  `📊 Dr. No (1962) | 📄 SUCCESS | ⏱️ 4.48s | 1.87 MB`. Same format for
+  `gen-game-info` (resolved Steam name).
+
 ## [1.5.1] — 2026-07-18
 
 ### Added

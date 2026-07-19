@@ -45,6 +45,7 @@ Handles **movies and TV series**, deciding what each video *is* from its **conte
 > Without a key, series pages still work (TVmaze needs no key) but movie pages are reduced to filename + Rotten Tomatoes/Wikipedia/YouTube data.
 
 - **Movies** → one `{filename}.html` next to the video.
+- **File details** (via `ffprobe`, when the file is present): resolution and codec, plus the available **audio tracks and subtitles with language flags** — shown per episode on series/season pages (tracks belong to the episode, not the series), with a series-level union in the details table.
 - **TV series** → episodes (`SxxExx`, in `Season N` subfolders or loose at the root) are grouped into **one series page**, plus **one page per season** that lives in its own folder. Owned episodes are marked (`✓`); the page lists the full season from the metadata source.
 - **Collections** (a folder of several unrelated movies) → one page **per movie**; the folder name is ignored.
 - Content not found on its metadata source (e.g. web-only clips) is **skipped** — no page is created.
@@ -131,6 +132,8 @@ gen-game-info --index /path/to/games/
 gen-video-info --index my-catalog.html /path/to/videos/
 ```
 
+Video cards also show the available audio/subtitle languages as flags (🔊 🇫🇷 🇬🇧 💬 🇫🇷, subtitle flags collapse to a count beyond 3 languages) and a **"4K · 5.1" pill** on the poster (resolution + best above-stereo layout), all read from the pages' file details — and the toolbar gains an **audio-language filter** (ISO 639 variants like `fr`/`fra`/`fre` are merged).
+
 A single-type catalog drops the type filter and names itself after that type (e.g. **Games**). The type is read from each page — so you *can* point one run at several roots for a combined catalog, but per-category is the usual case. Posters/headers are downscaled and inlined (one portable file); season pages are left out.
 
 | Flag | Description |
@@ -216,7 +219,7 @@ is still fetched.
 | Rotten Tomatoes | Tomatometer + Audience scores (clickable rating badges) |
 | Wikipedia | Summary, page link |
 | YouTube | Official trailer, review/trivia videos with thumbnails |
-| FFmpeg | Screenshots extracted from the local video (fallback when no online stills) |
+| FFmpeg | Screenshots extracted from the local video (fallback when no online stills); `ffprobe` reads resolution + audio/subtitle tracks |
 
 **TV series**
 
