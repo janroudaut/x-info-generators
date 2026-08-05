@@ -182,9 +182,9 @@ def main():
     groups["generation"].add_argument(
         "--screenshot-source", choices=["auto", "online", "ffmpeg", "off"],
         default="auto", metavar="MODE", dest="screenshot_source",
-        help="Where stills come from: auto (online TMDB backdrops, ffmpeg "
-             "fallback) [default], online (TMDB only), ffmpeg (local file "
-             "only), off (none).")
+        help="Where stills come from: auto (frames from the local file, TMDB "
+             "backdrops as fallback) [default], online (TMDB only), ffmpeg "
+             "(local file only), off (none).")
     network = parser.add_argument_group("network")
     network.add_argument(
         "--tmdb-api-key", metavar="KEY", dest="tmdb_api_key",

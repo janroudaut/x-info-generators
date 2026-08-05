@@ -3,7 +3,7 @@ import re
 import jinja2
 from markupsafe import Markup, escape
 
-from .utils import lang_flag
+from .utils import lang_label, lang_svg
 
 
 def _get_env():
@@ -16,7 +16,8 @@ def _get_env():
     env.filters["score_color_class"] = score_color_class
     env.filters["linebreaks"] = linebreaks
     env.filters["format_duration"] = format_duration
-    env.filters["lang_flag"] = lang_flag
+    env.filters["lang_label"] = lang_label
+    env.filters["lang_svg"] = lambda code: Markup(lang_svg(code))
     return env
 
 

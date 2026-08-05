@@ -20,10 +20,19 @@ from .processing import (
 
 # Primary token: S01E01 / S37E01 / S01.E01. Secondary: 1x05 (guarded by word
 # boundaries so codec tags like "x265" — no digit before the 'x' — never match).
+# Last: S2301, the same thing with the 'E' dropped — four digits are required,
+# so "S23.1080p" can't be read as season 23 episode 10.
 _EPISODE_PATTERNS = [
     re.compile(r'[Ss](\d{1,2})[\s._-]?[Ee](\d{1,2})'),
     re.compile(r'\b(\d{1,2})x(\d{2})\b'),
+    re.compile(r'[Ss](\d{2})(\d{2})\b'),
 ]
+
+# Bare "101 - Title.avi" numbering. Far too ambiguous on its own — it would read
+# "101 Dalmatians" as season 1 episode 1 — so it counts only where a folder is
+# full of files numbered the same way.
+_LOOSE_EPISODE_RE = re.compile(r'^(\d)(\d{2})(?=[\s._-])')
+_LOOSE_MIN_SIBLINGS = 3
 
 _SEASON_FOLDER_RE = re.compile(r'(?i)^(season[\s._-]*\d+|s\d{1,2})\b')
 _ILLEGAL_FS = re.compile(r'[<>:"/\\|?*]')
@@ -74,6 +83,23 @@ def parse_episode(name: str) -> Optional[Tuple[int, int, int]]:
     return None
 
 
+def _loose_episodes(paths: List[Path], parsed: dict) -> dict:
+    """``{path: (season, episode, 0)}`` for bare-numbered files, per folder.
+
+    Only folders holding several of them qualify — one such file on its own is
+    far more likely to be a title starting with digits.
+    """
+    by_dir: dict = {}
+    for path in paths:
+        if parsed.get(path) is not None:
+            continue
+        m = _LOOSE_EPISODE_RE.match(path.stem)
+        if m and int(m.group(1)) and int(m.group(2)):
+            by_dir.setdefault(path.parent, []).append((path, int(m.group(1)), int(m.group(2))))
+    return {p: (s, e, 0) for group in by_dir.values() if len(group) >= _LOOSE_MIN_SIBLINGS
+            for p, s, e in group}
+
+
 def _clean_series_name(raw: str) -> str:
     name = raw.replace('.', ' ').replace('_', ' ').replace('-', ' ')
     name = NOISE_REGEX.sub('', name)
@@ -116,6 +142,26 @@ def _extract_year(text: str) -> Optional[str]:
     return m.group(1) if m else None
 
 
+def _dedupe_episodes(episodes: List[Episode]) -> List[Episode]:
+    """One entry per episode number, sorted.
+
+    A season held twice (a tidy ``Season N`` folder plus a pack of the same
+    episodes) would otherwise list every episode twice and lose its season
+    page. The folder contributing the most episodes wins, a proper
+    ``Season N`` folder breaking the tie.
+    """
+    ranked = {}
+    for e in episodes:
+        ranked[e.path.parent] = ranked.get(e.path.parent, 0) + 1
+    rank = lambda e: (ranked[e.path.parent], bool(_SEASON_FOLDER_RE.match(e.path.parent.name)),
+                      str(e.path.parent))
+    best: dict = {}
+    for e in episodes:
+        if e.number not in best or rank(e) > rank(best[e.number]):
+            best[e.number] = e
+    return sorted(best.values(), key=lambda e: e.number)
+
+
 def _build_series_item(name: str, eps: List[Tuple[int, int, Path]]) -> MediaItem:
     paths = [p for (_, _, p) in eps]
     root = Path(os.path.commonpath([str(p.parent) for p in paths]))
@@ -131,7 +177,7 @@ def _build_series_item(name: str, eps: List[Tuple[int, int, Path]]) -> MediaItem
 
     seasons: List[SeasonGroup] = []
     for snum in sorted(by_season):
-        season_eps = sorted(by_season[snum], key=lambda e: e.number)
+        season_eps = _dedupe_episodes(by_season[snum])
         dirs = {e.path.parent for e in season_eps}
         folder = html_path = None
         if len(dirs) == 1:
@@ -155,8 +201,11 @@ def classify_items(video_paths: List[Path]) -> List[MediaItem]:
     series_name: dict[str, str] = {}
     movies: List[Path] = []
 
+    tokens = {p: parse_episode(p.stem) for p in video_paths}
+    tokens.update(_loose_episodes(video_paths, tokens))
+
     for path in video_paths:
-        parsed = parse_episode(path.stem)
+        parsed = tokens[path]
         if parsed is None:
             movies.append(path)
             continue

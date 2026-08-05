@@ -17,6 +17,7 @@ from ..templates import render_template
 from .. import __version__
 from .fetchers import (
     fetch_tmdb_search, fetch_tmdb_detail, fetch_tmdb_rating, fetch_tmdb_stills,
+    fetch_tmdb_fr_details, fetch_tmdb_specific_title, fetch_tmdb_collection,
     resolve_imdb_id_wikidata,
     generate_screenshots_async, probe_media_info,
     fetch_rotten_tomatoes_data, fetch_wikipedia_data,
@@ -55,14 +56,32 @@ def find_movie_files(path: Path) -> List[Path]:
     elif path.is_dir():
         for root, _, files in os.walk(path):
             for file in files:
-                if file.lower().endswith(VIDEO_EXTENSIONS):
+                # Dotfiles here are work in progress, not library content
+                # (transcoders park ".convert-XXXX.mkv" next to the source).
+                if file.lower().endswith(VIDEO_EXTENSIONS) and not file.startswith("."):
                     movie_files.append(Path(root) / file)
     return movie_files
 
 
+# French-market release tags: the file was named after the French release
+# title, so TMDB lookups should compare against French titles too.
+_FR_TAG_REGEX = re.compile(r'\b(truefrench|french|vff|vfq|vfi|vf|vostfr|vost|multi)\b', re.IGNORECASE)
+_IMDB_ID_REGEX = re.compile(r'[{\[]?\b(tt\d{7,8})\b[}\]]?', re.IGNORECASE)
+
+
+def parse_filename_hints(filepath: Path) -> Dict[str, Optional[str]]:
+    """Resolution hints read from the raw stem (before title cleaning): an
+    explicit IMDb id token (Radarr-style) pins the title; a French release tag
+    localizes the TMDB search."""
+    stem = filepath.stem
+    m = _IMDB_ID_REGEX.search(stem)
+    return {"imdb_id": m.group(1).lower() if m else None,
+            "lang": "fr" if _FR_TAG_REGEX.search(stem) else None}
+
+
 def clean_filename_to_title(filepath: Path) -> tuple[str, Optional[str]]:
     """Extract movie title and year from a filename."""
-    name = filepath.stem
+    name = _IMDB_ID_REGEX.sub(' ', filepath.stem)
 
     # A year in (...) or [...] is explicitly the release year and ends the
     # title — so a bare year *inside* the title survives ("New-york 1997
@@ -78,18 +97,144 @@ def clean_filename_to_title(filepath: Path) -> tuple[str, Optional[str]]:
     name = re.sub(r'[\._-]', ' ', name)
 
     if not year:
-        year_match = re.search(r'\b(19[0-9]{2}|20[0-2][0-9]|2030)\b', name)
-        if year_match:
-            year = year_match.group(1)
-            name = name[:year_match.start()].strip()
+        # A release year always has a title in front of it, so a leading bare
+        # year is the title, not the release date.
+        for m in re.finditer(r'\b(19[0-9]{2}|20[0-2][0-9]|2030)\b', name):
+            if NOISE_REGEX.sub('', name[:m.start()]).strip(' .-_'):
+                year = m.group(1)
+                name = name[:m.start()].strip()
+                break
 
     name = NOISE_REGEX.sub('', name).strip()
     name = re.sub(r'\s+', ' ', name)
     return name, year
 
 
+_DASH_FIELD_SPLIT = re.compile(r'\s+-\s*|\s*-\s+')
+_YEAR_FIELD_RE = re.compile(r'^(19[0-9]{2}|20[0-2][0-9]|2030)$')
+
+
+def _clean_field(text: str) -> str:
+    text = NOISE_REGEX.sub('', re.sub(r'[\._]', ' ', text))
+    return re.sub(r'\s+', ' ', text).strip(' -')
+
+
+def filename_title_candidates(filepath: Path) -> tuple[List[str], Optional[str]]:
+    """Search titles to try for one file, best first, plus the release year.
+
+    ``Collection - YEAR - Title - specs`` names put the real title *after* the
+    year, exactly where :func:`clean_filename_to_title` truncates — which leaves
+    every entry of a collection sharing one meaningless title. When a whole
+    dash-separated field is a year, the field behind it leads instead.
+    """
+    base, year = clean_filename_to_title(filepath)
+    fields = _DASH_FIELD_SPLIT.split(_IMDB_ID_REGEX.sub(' ', filepath.stem))
+    candidates = []
+    for i, field in enumerate(fields[:-1]):
+        if not _YEAR_FIELD_RE.match(field.strip()):
+            continue
+        tail = _clean_field(fields[i + 1])
+        if len(tail) < 3 or not re.search(r'[^\W\d_]', tail):
+            break  # nothing but specs behind the year
+        prefix = _clean_field(' '.join(fields[:i]))
+        candidates = [tail, f"{prefix} {tail}".strip()]
+        break
+    candidates.append(base)
+    return list(dict.fromkeys(c for c in candidates if c)), year
+
+
+def _year_gap(a, b) -> int:
+    """Years apart, 0 when either side is unknown (benefit of the doubt)."""
+    try:
+        return abs(int(a) - int(b))
+    except (TypeError, ValueError):
+        return 0
+
+
 def _get_html_path(movie_path: Path) -> Path:
     return movie_path.parent / f"{movie_path.stem}.html"
+
+
+async def _resolve_movie(session, cache, title: str, year: Optional[str],
+                         lang: Optional[str], log: Callable):
+    """``(tmdb_data, imdb_id)`` for one candidate title, both None if unknown."""
+    imdb_id = await _cached(
+        cache, "wikidata-imdb", f"{title}|{year or ''}",
+        lambda: resolve_imdb_id_wikidata(session, title, year, log),
+    )
+    tmdb_data = None
+    if imdb_id:
+        tmdb_data = await _cached(
+            cache, "movie-tmdb-detail", imdb_id,
+            lambda: fetch_tmdb_detail(session, imdb_id, log),
+        )
+        # A resolved title whose year is far off the filename's is a
+        # misresolution (homonyms, translated labels) — drop it and retry
+        # by title. Runs post-cache, so stale wrong ids heal themselves.
+        if tmdb_data and year and _year_gap(tmdb_data.get("year"), year) > 1:
+            log(f"    {D.WARNING} TMDB: '{tmdb_data.get('title')}' ({tmdb_data.get('year')}) "
+                f"doesn't match file year {year} — retrying by title.")
+            tmdb_data, imdb_id = None, None
+    if not tmdb_data and not imdb_id:
+        tmdb_data = await _cached(
+            cache, "movie-tmdb-search", f"{title}|{year or ''}|{lang or ''}",
+            lambda: fetch_tmdb_search(session, title, year, log, lang=lang),
+        )
+    return tmdb_data, imdb_id
+
+
+_SIMPLIFY_RE = re.compile(r'[^a-z0-9]+')
+
+
+def _simplify(text: Optional[str]) -> str:
+    return _SIMPLIFY_RE.sub(' ', (text or '').casefold()).strip()
+
+
+def _looks_truncated(tmdb_title: str, filename_title: str) -> bool:
+    """TMDB's canonical title is the filename's title cut short."""
+    short, long = _simplify(tmdb_title), _simplify(filename_title)
+    return bool(short) and long.startswith(short) and len(long) > len(short) + 4
+
+
+async def _apply_title_policy(session, cache, data: Dict[str, Any],
+                              filename_title: str, log: Callable) -> None:
+    """Choose the displayed title; ``lookup_title`` keeps the English form the
+    anglophone sources (Rotten Tomatoes, Wikipedia) are indexed under."""
+    tmdb_id = data.get("tmdb_id")
+    original = data.get("original_title")
+    if data.get("original_language") == "fr":
+        if original and original != data["title"]:
+            data["lookup_title"] = data["title"]
+            data["title"] = original
+        if tmdb_id:
+            fr = await _cached(
+                cache, "movie-tmdb-fr", str(tmdb_id),
+                lambda: fetch_tmdb_fr_details(session, tmdb_id, log),
+            )
+            if fr:
+                data.update(fr)  # French synopsis and poster artwork
+    elif tmdb_id and _looks_truncated(data["title"], filename_title):
+        fuller = await _cached(
+            cache, "movie-tmdb-alt-title", str(tmdb_id),
+            lambda: fetch_tmdb_specific_title(session, tmdb_id, data["title"], filename_title, log),
+        )
+        if fuller:
+            data["lookup_title"] = data["title"]
+            data["title"] = fuller
+
+    lookup = data.get("lookup_title")
+    if lookup and _simplify(lookup) not in _simplify(data["title"]):
+        data["alt_title"] = lookup
+
+
+async def _ensure_collection(session, cache, data: Dict[str, Any], log: Callable) -> None:
+    """Fill in the franchise for entries cached before it was read."""
+    tmdb_id = data.get("tmdb_id")
+    if "collection" in data or not tmdb_id:
+        return
+    extra = await _cached(cache, "movie-tmdb-collection", str(tmdb_id),
+                          lambda: fetch_tmdb_collection(session, tmdb_id, log))
+    data["collection"] = (extra or {}).get("collection")
 
 
 async def _cached_screenshots(cache, movie_path: Path, temp_dir: Path, max_screenshots: int, log: Callable) -> List[str]:
@@ -177,23 +322,23 @@ async def _resolve_screenshots(
 ) -> List[str]:
     """Screenshot data URIs, honouring ``--screenshot-source``.
 
-    ``auto``: online stills (TMDB backdrops) first, ffmpeg fallback on the local
-    file when there are none. ``online``/``ffmpeg`` force one source; ``off``
-    yields none.
+    ``auto``: frames from the local file (they show the actual copy), falling
+    back to TMDB backdrops when ffmpeg is unavailable or the file yields
+    nothing. ``online``/``ffmpeg`` force one source; ``off`` yields none.
     """
     if strategy == "off":
         return []
+    if strategy in ("auto", "ffmpeg") and video_path is not None:
+        shots = await _cached_screenshots(cache, video_path, temp_dir, n, log)
+        if shots or strategy == "ffmpeg":
+            return shots
     if strategy in ("auto", "online") and imdb_id:
         urls = await _cached(cache, "tmdb-stills", f"{imdb_id}|{n}",
                              lambda: fetch_tmdb_stills(session, imdb_id, n, log))
         if urls:
             encoded = [await cached_image_data_uri(session, u, cache, temp_dir, log, f"Still {i + 1}")
                        for i, u in enumerate(urls)]
-            encoded = [e for e in encoded if e]
-            if encoded:
-                return encoded
-    if strategy in ("auto", "ffmpeg") and video_path is not None:
-        return await _cached_screenshots(cache, video_path, temp_dir, n, log)
+            return [e for e in encoded if e]
     return []
 
 
@@ -212,29 +357,36 @@ async def process_movie_file(
         if force and html_path.exists() and not cache.offline:
             html_path.unlink()
 
-        clean_title, year = clean_filename_to_title(movie_path)
-        if not clean_title:
+        candidates, year = filename_title_candidates(movie_path)
+        if not candidates:
             stats.status = "ERROR"
             return stats
+        clean_title = candidates[0]
 
         # Resolve the IMDb id via Wikidata (reliable) and read full metadata from
-        # TMDB (mapped via /find); fall back to a TMDB title search.
-        imdb_id = await _cached(
-            cache, "wikidata-imdb", f"{clean_title}|{year or ''}",
-            lambda: resolve_imdb_id_wikidata(session, clean_title, year, log),
-        )
-        if imdb_id:
+        # TMDB (mapped via /find); fall back to a TMDB title search. An explicit
+        # tt-id in the filename pins the title and skips all guessing.
+        hints = parse_filename_hints(movie_path)
+        pinned = hints["imdb_id"]
+        imdb_id = tmdb_data = None
+        if pinned:
+            log(f"    {D.SUCCESS_DATA} IMDb id pinned by filename: {pinned}")
+            imdb_id = pinned
             tmdb_data = await _cached(
                 cache, "movie-tmdb-detail", imdb_id,
                 lambda: fetch_tmdb_detail(session, imdb_id, log),
             )
         else:
-            tmdb_data = await _cached(
-                cache, "movie-tmdb-search", f"{clean_title}|{year or ''}",
-                lambda: fetch_tmdb_search(session, clean_title, year, log),
-            )
+            for candidate in candidates:
+                tmdb_data, imdb_id = await _resolve_movie(
+                    session, cache, candidate, year, hints["lang"], log)
+                if tmdb_data or imdb_id:
+                    clean_title = candidate
+                    break
 
         if tmdb_data:
+            await _apply_title_policy(session, cache, tmdb_data, clean_title, log)
+            await _ensure_collection(session, cache, tmdb_data, log)
             aggregated_data = tmdb_data
         elif imdb_id:
             # The film is identified (Wikidata gave an IMDb id) but the TMDB lookup
@@ -243,27 +395,40 @@ async def process_movie_file(
             log(f"    {D.WARNING} TMDB detail unavailable; building partial page.")
             stats.failed_sources.append("TMDB")
             aggregated_data = {"title": clean_title, "year": year, "imdb_id": imdb_id}
+        elif year:
+            # Unidentified but carries a year — a real release no source knows
+            # under this name. A partial page beats both a wrong film and none.
+            log(f"    {D.WARNING} No confident match; building partial page from filename.")
+            stats.failed_sources.append("TMDB")
+            aggregated_data = {"title": clean_title, "year": year}
         else:
-            # Not identified anywhere (e.g. web-only clips) → skip.
+            # Not identified anywhere and no year (e.g. web-only clips) → skip.
             stats.status = "INSUFFICIENT_DATA"
             stats.failed_sources.append("TMDB")
             return stats
 
         title = aggregated_data["title"]
+        # Rotten Tomatoes and the English Wikipedia only know the anglophone
+        # title; it also keeps the cache keys stable when the display title
+        # switches to French.
+        lookup_title = aggregated_data.get("lookup_title") or title
+        lang = "fr" if aggregated_data.get("original_language") == "fr" else None
         movie_year = aggregated_data.get("year")
         stats.title = f"{title} ({movie_year})" if movie_year else title
-        meta_key = f"{title}|{movie_year or ''}"
+        meta_key = f"{lookup_title}|{movie_year or ''}"
+        lang_key = f"{meta_key}|{lang}" if lang else meta_key  # English entries keep their key
 
         # Build parallel tasks (cached metadata fetches + image work)
         tasks = {
-            "wikipedia": _cached(cache, "movie-wikipedia", meta_key,
-                                 lambda: fetch_wikipedia_data(title, movie_year, log)),
+            "wikipedia": _cached(cache, "movie-wikipedia", lang_key,
+                                 lambda: fetch_wikipedia_data(title, movie_year, log, lang=lang,
+                                                              fallback_title=lookup_title)),
             "rotten_tomatoes": _cached(cache, "movie-rt", meta_key,
-                                       lambda: fetch_rotten_tomatoes_data(session, title, movie_year, log)),
-            "youtube_trailer": _cached(cache, "movie-yt-trailer", meta_key,
-                                       lambda: fetch_youtube_trailer(session, title, movie_year, log)),
-            "youtube_reviews": _cached(cache, "movie-yt-reviews", meta_key,
-                                       lambda: fetch_youtube_reviews(session, title, movie_year, log)),
+                                       lambda: fetch_rotten_tomatoes_data(session, lookup_title, movie_year, log)),
+            "youtube_trailer": _cached(cache, "movie-yt-trailer", lang_key,
+                                       lambda: fetch_youtube_trailer(session, title, movie_year, log, lang=lang)),
+            "youtube_reviews": _cached(cache, "movie-yt-reviews", lang_key,
+                                       lambda: fetch_youtube_reviews(session, title, movie_year, log, lang=lang)),
             "screenshots": _resolve_screenshots(screenshot_source, cache, session,
                                                 aggregated_data.get("imdb_id"), movie_path,
                                                 temp_dir, max_screenshots, log),

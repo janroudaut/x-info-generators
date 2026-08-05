@@ -3,31 +3,143 @@
 All notable changes to this project are documented here.
 This project adheres to [Semantic Versioning](https://semver.org/).
 
-## [1.6.0] — 2026-07-19
+## [1.6.0] — 2026-08-05
+
+> **Upgrading**: entries cached by an earlier version don't carry the fields
+> this release reads (a film's original language, its collection). Franchise
+> tags backfill themselves on the next run; French titles need the movie detail
+> refetched — `--update-cache`, or delete
+> `~/.cache/x-info-generators/movie-tmdb-detail`. Pages must be regenerated
+> (`--force`) before rebuilding the catalog.
+
+### Fixed
+- **Catalog filters were lost on the way back** — opening an item and hitting
+  Back landed on an unfiltered, unsorted grid. Search, filters and sort order
+  now live in the URL fragment, so the browser restores them like any other
+  address (and a narrowed view becomes shareable). The History API is
+  unavailable on some `file://` setups, where a fragment-only
+  `location.replace()` does the same job without stacking history entries.
+  A head script keeps the cards out of the first paint while a filtered view
+  is being restored, so the grid no longer flashes unfiltered — only when
+  there is state to restore, and with a failsafe should the script die. With
+  no state to restore the catalog touches no card at all on load (it ships
+  sorted by title), and sorting skips re-inserting cards whose order already
+  holds.
+- **Accented and numeric titles sorted last in the catalog** — the page was
+  built with a key that folded case but not diacritics, so an accented initial
+  landed past "z", and numeric segments were ranked behind every letter. Both
+  now match the browser's collator: digits first, accents folded. The order
+  the page ships with is the one "Sort: Title" produces, so picking it never
+  reshuffles the grid.
+- **Titles truncated at the year** — files named
+  `Collection - YEAR - Title - specs` (a very common pattern for boxed sets)
+  lost everything behind the year, so every entry of a set was looked up under
+  the collection's name, the year left as the only discriminant — enough for
+  some of them to land on another film entirely, silently. When a whole
+  dash-separated field is a year, the field behind it now leads the search,
+  with the previous title kept as a fallback candidate. Names with the year in
+  `(…)`/`[…]` or at the end are unaffected.
+- **A year as the whole title** — a name opening on a bare year read it as the
+  release year, leaving no title at all and failing the file outright. A
+  release year always has a title in front of it, so years with nothing before
+  them are skipped.
+- **Episodes read as movies** — three naming habits fell through the episode
+  patterns and produced a standalone movie page per file: `S2301` (the `E`
+  dropped), `101 - Title.avi` (season and episode as three bare digits), and
+  seasons held twice. The bare-digit form is only trusted where several files
+  in a folder are numbered that way, so a title starting with digits stays a
+  film. A season present twice (a tidy `Season N` folder plus a pack of the
+  same episodes) is deduplicated instead of being listed twice and losing its
+  season page.
+- **Hidden files are skipped** — transcoders park `.convert-XXXX.mkv` next to
+  the source; those were picked up and given pages of their own.
+- **Screenshots lost to a wrong duration** — timestamps were derived from
+  `format.duration`, which a broken audio stream can push hours past the last
+  video frame: every shot behind the real end failed, and the exception
+  discarded the ones already taken. The container and video-stream durations
+  are now reconciled (Matroska reports no per-stream duration, so neither can
+  be trusted alone), and a failed shot no longer voids the batch — partial
+  results are kept and reported as `n/N`.
+- **Movie misresolution guards** — a French-market release named after a local
+  title could resolve to a completely different film via a translated Wikidata
+  label. Now: candidates whose release year is more than ±1 off the filename's
+  are rejected (Wikidata pick and post-cache TMDB detail check), and TMDB
+  title-search results are scored by title similarity (accepted above a
+  threshold, stricter on the year-less retry) instead of taking the first
+  result. A French release tag (`FRENCH`, `TRUEFRENCH`, `VF`, `VOSTFR`,
+  `MULTI`…) localizes the search so similarity is computed against French
+  titles. When nothing confident remains and the filename carries a year, a
+  **partial page** is built instead of a wrong film (files without a year are
+  still skipped).
+- **Miniseries/TV specials stored as movie files** now get full TMDB metadata:
+  when `/find` resolves the IMDb id to a TV title, the `/tv/{id}` detail is
+  fetched and mapped to the movie shape (creators shown as directors, episode
+  runtime), instead of degrading to a partial page.
 
 ### Added
+- **French films shown under their French title** — TMDB's canonical title is
+  the English one, so a French film could be listed under an English name
+  nobody uses for it. Titles TMDB reports as French-language
+  (`original_language`) now show their original title, their French synopsis
+  when there is one, the French poster artwork, a French Wikipedia summary
+  (falling back to English) and French-worded YouTube queries. The English
+  title stays visible under the heading and remains the lookup key for Rotten
+  Tomatoes and the English Wikipedia. Genres deliberately stay in English so
+  the catalog filter doesn't split into "Comédie" and "Comedy".
+- **Franchise tags from TMDB collections** — movie pages gain a *Collection*
+  row and the catalog a franchise filter, both fed by TMDB's curated
+  `belongs_to_collection`. It costs no extra request (the field rides along
+  with the movie detail) and, unlike grouping by folder, it holds when the
+  sequels sit in unrelated folders and never mistakes a release pack for a
+  franchise.
+- **Fuller title when TMDB's is the short one** — TMDB sometimes holds only
+  the short form of a title; when the filename clearly names a longer one, the
+  alternative-titles list provides it (scene release names in that list are
+  filtered out).
+- **IMDb id pinning in the filename** — a Radarr-style `{tt1234567}` token
+  (braces optional) forces the resolution, for titles no source knows under
+  their local release name.
 - **File details on video pages** (`ffprobe`): resolution + codec, audio
   tracks and subtitles with language flags. Tracks belong to episodes, so
-  series/season pages show them per episode line, with a series-level union
-  in the details table. Cached by file path+mtime. Untagged/`und` tracks show
-  a neutral 🌐, and identical unlabeled tracks are collapsed into one entry
-  with a count ("🌐 ×14").
-- **Language flags on catalog cards** (🔊 🇫🇷🇬🇧 💬 🇫🇷), read from the pages'
-  file details — regenerate pages (`--force`) then the catalog to see them.
+  series/season pages show them per episode line, with a series-level union in
+  the details table. Cached by file path+mtime. Identical unlabeled tracks are
+  collapsed into one entry with a count.
+- **Language flags on catalog cards**, read from the pages' file details —
+  regenerate pages (`--force`) then the catalog to see them.
 - **Audio-language filter in the catalog** (videos) — an "All languages"
-  dropdown with flags and counts; ISO 639 variants (`fr`/`fra`/`fre`) are
-  merged into one entry.
+  dropdown with counts; ISO 639 variants (`fr`/`fra`/`fre`) are merged into
+  one entry.
 - **Resolution/audio badge on catalog posters** — top-right corner pill like
   "4K · 5.1" (resolution label + best channel layout when above stereo).
   Subtitles on cards show flags up to 3 distinct languages, a count beyond
-  (full list as tooltip); audio flags are spaced.
+  (full list as tooltip). The movie page's Subtitles row follows the same
+  rule.
 
 ### Changed
+- **The catalog degrades cleanly without JavaScript** — the grid, posters,
+  flags and links never needed it; the toolbar, which does, now hides itself
+  via `<noscript>` instead of offering dead controls.
+- **Language flags are inline artwork, not emoji** — Windows ships no flag
+  glyphs, so Chrome rendered a flag emoji as the bare letter pair it is built
+  from (Firefox only escaped this by bundling its own emoji font). Flags are
+  now inline SVG carried by the page, identical in every browser; where markup
+  can't go (tooltips, `<option>` labels) the language code is spelled out.
+  Untagged tracks show `?`.
+- **Screenshots come from the file first** — `--screenshot-source auto` now
+  extracts frames locally and falls back to TMDB backdrops only when ffmpeg is
+  missing or yields nothing (it was the other way round). Stills then show the
+  actual copy, cut and grading included.
+- **Natural title sort in the catalog** — the part before the colon is
+  compared first, so a first instalment precedes its numbered sequel (`:`
+  outranks ` 2` in any collation). Numeric-aware, applied both when building
+  the page and in the browser, and used as a tiebreak for the year and rating
+  sorts.
+- **Catalog: the main score drops its "TMDB" label** — the number alone, with
+  the source as a tooltip; the other badges (IMDb, 🍅, 🍿, MC) are unchanged.
 - **More readable per-item CLI output** — the header shows the movie's
   filename (inside a collection folder the cleaned title is identical for
-  every file), and the status line leads with the resolved title:
-  `📊 Dr. No (1962) | 📄 SUCCESS | ⏱️ 4.48s | 1.87 MB`. Same format for
-  `gen-game-info` (resolved Steam name).
+  every file), and the status line leads with the resolved title, status,
+  duration and page size. Same format for `gen-game-info`.
 
 ## [1.5.1] — 2026-07-18
 

@@ -1,8 +1,10 @@
 import asyncio
 import base64
+import difflib
 import fnmatch
 import mimetypes
 import re
+import unicodedata
 from pathlib import Path
 from typing import Optional, Sequence
 
@@ -32,6 +34,21 @@ def path_matches_ignore(path: Path, patterns: Optional[Sequence[str]]) -> bool:
             if fnmatch.fnmatch(full, pat) or any(fnmatch.fnmatch(part, pat) for part in parts):
                 return True
     return False
+
+
+def _norm_title(s: Optional[str]) -> str:
+    s = unicodedata.normalize("NFKD", s or "")
+    s = "".join(c for c in s if not unicodedata.combining(c)).casefold()
+    return re.sub(r"[^a-z0-9]+", " ", s).strip()
+
+
+def title_similarity(a: Optional[str], b: Optional[str]) -> float:
+    """Similarity ratio in [0, 1] between two titles, ignoring case,
+    diacritics and punctuation."""
+    a, b = _norm_title(a), _norm_title(b)
+    if not a or not b:
+        return 0.0
+    return difflib.SequenceMatcher(None, a, b).ratio()
 
 
 def format_bytes(size_bytes: int) -> str:
@@ -130,10 +147,19 @@ def canon_lang(code: Optional[str]) -> str:
     return _LANG_CANON.get(code, code)
 
 
-def lang_flag(code: Optional[str]) -> str:
-    """Emoji flag for a language code; undetermined tracks get a neutral
-    globe, other unknown codes show as text."""
+def lang_label(code: Optional[str]) -> str:
+    """Short text form of a language, for tooltips and <option> labels — the
+    places markup can't go. Undetermined tracks get a question mark."""
     code = (code or "").strip().lower()
-    if code in ("", "und"):
-        return "🌐"
-    return _LANG_FLAGS.get(code, code.upper())
+    return "?" if code in ("", "und") else code.upper()
+
+
+def lang_svg(code: Optional[str]) -> str:
+    """Inline flag artwork for a language, falling back to its code.
+
+    Emoji flags are not an option: Windows ships no flag glyphs, so Chrome
+    renders them as the bare letter pair the emoji is built from.
+    """
+    from .flags import FLAG_SVG
+    svg = FLAG_SVG.get(canon_lang(code))
+    return svg or f'<span class="flag-code">{lang_label(code)}</span>'

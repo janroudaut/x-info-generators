@@ -47,8 +47,11 @@ Handles **movies and TV series**, deciding what each video *is* from its **conte
 - **Movies** → one `{filename}.html` next to the video.
 - **File details** (via `ffprobe`, when the file is present): resolution and codec, plus the available **audio tracks and subtitles with language flags** — shown per episode on series/season pages (tracks belong to the episode, not the series), with a series-level union in the details table.
 - **TV series** → episodes (`SxxExx`, in `Season N` subfolders or loose at the root) are grouped into **one series page**, plus **one page per season** that lives in its own folder. Owned episodes are marked (`✓`); the page lists the full season from the metadata source.
-- **Collections** (a folder of several unrelated movies) → one page **per movie**; the folder name is ignored.
-- Content not found on its metadata source (e.g. web-only clips) is **skipped** — no page is created.
+- **Collections** (a folder of several unrelated movies) → one page **per movie**; the folder name is ignored. In boxed-set naming (`Collection - YEAR - Title - specs`) the title is read *behind* the year, so every entry doesn't end up searched under the collection's name.
+- **French films keep their French title** — TMDB's canonical title is the English one, so a French film would be listed under an English name nobody uses for it. Titles TMDB reports as French-language show their original title, French synopsis, French poster and a French Wikipedia summary (English as fallback); the English title stays under the heading and remains what Rotten Tomatoes is queried with. Genres stay in English so the catalog filter doesn't split in two.
+- **Misresolution guards**: a candidate whose release year is more than ±1 off the year parsed from the filename is rejected, and title-search results are accepted only above a similarity threshold. A French release tag in the name (`FRENCH`, `TRUEFRENCH`, `VF`, `VOSTFR`, `MULTI`…) makes the search compare against **French titles**. When nothing confident is found, the file gets a **partial page** (filename + Rotten Tomatoes/Wikipedia/YouTube/FFmpeg data) — better than a wrong film.
+- **Pin the title by IMDb id** when heuristics can't identify it (local release title unknown to TMDB/Wikidata): put a `{tt1234567}` token anywhere in the filename (Radarr-style, braces optional) and resolution skips all guessing.
+- Content not found on its metadata source and carrying no year in its name (e.g. web-only clips) is **skipped** — no page is created.
 
 ```bash
 gen-video-info /path/to/The.Matrix.1999.mkv           # single movie
@@ -79,22 +82,23 @@ Each season that lives in its own folder also gets a page listing every episode 
 
 ### How screenshots are acquired
 
-By default (`--screenshot-source auto`), stills are fetched **online** from
-TMDB (`/movie|tv/{id}/images` — landscape *backdrops*, textless ones first), so a
-page has real screenshots **even when generated from a name alone**, with no local
-file and no FFmpeg. When a title has no online stills, it **falls back to FFmpeg**, which
-extracts evenly-spaced frames from the local video (the first owned episode for a
-series). Either way the results are cached, so re-runs do no extra work.
+By default (`--screenshot-source auto`), **FFmpeg** extracts evenly-spaced frames
+from the local video (the first owned episode for a series), so the stills show
+*your* copy — its cut, its grading, its subtitles burnt in or not. When FFmpeg is
+missing or the file yields nothing, it **falls back to TMDB backdrops**
+(`/movie|tv/{id}/images`, textless ones first), which also lets a page have real
+screenshots **when generated from a name alone**, with no local file. Either way
+the results are cached (by path + mtime), so re-runs do no extra work.
 
 | `--screenshot-source` | Behaviour |
 |-----------------------|-----------|
-| `auto` *(default)* | Online stills, then FFmpeg fallback for titles that have none |
-| `online` | Online stills only — no FFmpeg (titles without stills get none) |
-| `ffmpeg` | Always extract frames from the local file (ignores online stills) |
+| `auto` *(default)* | Frames from the local file, TMDB backdrops as fallback |
+| `online` | TMDB backdrops only — no FFmpeg |
+| `ffmpeg` | Local file only (never goes online) |
 | `off` | No screenshots at all |
 
-`--max-screenshots N` caps how many are kept (default 8). FFmpeg is therefore
-**only** needed for the fallback — see [Supported video formats](#supported-video-formats).
+`--max-screenshots N` caps how many are kept (default 8) — see
+[Supported video formats](#supported-video-formats).
 
 ## 🎮 gen-game-info
 
@@ -115,7 +119,7 @@ A full game page — description, details, Metacritic + Steam reviews, links and
 
 ## 🗂️ Catalog (`--index`)
 
-`--index` builds a single, browsable **catalog** from the pages **already generated** on disk — no generation, no network. It scans the given paths for generated `.html`, reads each page (title, type, year, ratings, poster) and writes a self-contained catalog file (`00_INDEX.html` by default) with client-side **search, type & genre filters and sort**. The search box matches the **title and year** — and, for videos, also the **folder path** under the scanned root (type `007` to list a whole collection folder), the **cast** and the **directors**. A term is treated as a year when it starts with `19` or `20` and has at least 3 digits, and it matches by **prefix** — `197` lists the whole 1970s, while `007` only searches the text. Terms combine (AND): `keanu 1999` lists Keanu Reeves titles from 1999. Wrap a phrase in quotes for an exact match: `"daniel craig"` won't match a Daniel plus an unrelated Craig. The video catalog is the page at the top of this README; here's a games one:
+`--index` builds a single, browsable **catalog** from the pages **already generated** on disk — no generation, no network. It scans the given paths for generated `.html`, reads each page (title, type, year, ratings, poster) and writes a self-contained catalog file (`00_INDEX.html` by default) with client-side **search, type & genre filters and sort**. The search box matches the **title and year** — and, for videos, also the **folder path** under the scanned root (type `007` to list a whole collection folder), the **cast** and the **directors**. A term is treated as a year when it starts with `19` or `20` and has at least 3 digits, and it matches by **prefix** — `197` lists the whole 1970s, while `007` only searches the text. Terms combine (AND): `keanu 1999` lists Keanu Reeves titles from 1999. Wrap a phrase in quotes for an exact match: `"daniel craig"` won't match a Daniel plus an unrelated Craig. Titles sort naturally: digit runs compare as numbers, and the part before the colon leads, so a first instalment comes before its numbered sequel. The video catalog is the page at the top of this README; here's a games one:
 
 <p align="center">
   <img src="assets/screenshots/catalog-games.png" width="760" alt="A games catalog">
@@ -352,3 +356,8 @@ src/x_info_generators/
 ## License
 
 [WTFPL](LICENSE) — Do What The Fuck You Want To Public License.
+
+The flag artwork inlined in generated pages
+(`src/x_info_generators/flags.py`) comes from
+[Twemoji](https://github.com/jdecked/twemoji), © Twitter, Inc and other
+contributors, licensed [CC-BY 4.0](https://creativecommons.org/licenses/by/4.0/).

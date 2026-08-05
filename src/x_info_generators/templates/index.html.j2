@@ -32,6 +32,8 @@ header h1 { color: #569cd6; font-size: 2.2em; margin: 0 0 4px; }
 .title { font-weight: 600; font-size: 0.95em; line-height: 1.25; }
 .year { color: #9a9a9a; font-size: 0.85em; }
 .tracks { color: #9a9a9a; font-size: 0.85em; }
+.flag { width: 1.15em; height: 1.15em; vertical-align: -0.2em; border-radius: 2px; }
+.flag-code { font-size: 0.85em; font-weight: 600; letter-spacing: 0.03em; }
 .badges { display: flex; flex-wrap: nowrap; gap: 8px; margin-top: auto; padding-top: 6px; }
 .badge { display: inline-flex; align-items: center; gap: 3px; font-size: 0.72em; color: #9a9a9a; white-space: nowrap; }
 .score { font-weight: bold; padding: 1px 5px; border-radius: 3px; color: white; }
@@ -45,7 +47,23 @@ header h1 { color: #569cd6; font-size: 2.2em; margin: 0 0 4px; }
 #empty { display: none; text-align: center; color: #888; padding: 50px 0; font-size: 1.1em; }
 footer { text-align: center; margin-top: 30px; padding-top: 15px; border-top: 1px solid #383838; font-size: 0.85em; color: #777; }
 @media (max-width: 600px) { .grid { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; } header h1 { font-size: 1.6em; } .badges { flex-wrap: wrap; } }
+/* Restoring a filtered view: keep every card out of the first paint, so the
+   grid doesn't flash unfiltered before the script narrows it down. */
+.prefilter .card { display: none; }
 </style>
+<noscript><style>
+/* Search, filters and sort are all script-driven: without it the grid still
+   lists everything, but dead controls would only mislead. */
+.toolbar { display: none; }
+</style></noscript>
+<script>
+// Head script — runs before a single card is parsed. Only pays the cost when
+// there is state to restore; the failsafe covers a script that dies later.
+if (location.hash) {
+  document.documentElement.classList.add("prefilter");
+  setTimeout(function() { document.documentElement.classList.remove("prefilter"); }, 2000);
+}
+</script>
 </head>
 <body>
 <div class="wrap">
@@ -70,10 +88,16 @@ footer { text-align: center; margin-top: 30px; padding-top: 15px; border-top: 1p
 {% for g in all_genres %}<option value="{{ g.value }}">{{ g.label }} ({{ g.count }})</option>
 {% endfor %}</select>
 {% endif %}
+{% if all_collections %}
+<select id="collection">
+<option value="all">All collections</option>
+{% for c in all_collections %}<option value="{{ c.value }}">{{ c.label }} ({{ c.count }})</option>
+{% endfor %}</select>
+{% endif %}
 {% if all_audio_langs %}
 <select id="lang">
 <option value="all">All languages</option>
-{% for l in all_audio_langs %}<option value="{{ l.value }}">{{ l.value | lang_flag }} {{ l.value }} ({{ l.count }})</option>
+{% for l in all_audio_langs %}<option value="{{ l.value }}">{{ l.value | lang_label }} ({{ l.count }})</option>
 {% endfor %}</select>
 {% endif %}
 <select id="sort">
@@ -85,7 +109,7 @@ footer { text-align: center; margin-top: 30px; padding-top: 15px; border-top: 1p
 
 <div class="grid" id="grid">
 {% for e in entries %}
-<a class="card" href="{{ e.href }}" data-kind="{{ e.kind }}" data-title="{{ e.title | lower }}" data-year="{{ e.year or '' }}" data-score="{{ '%.3f' | format(e.sort_score) }}" data-genres="{{ e.genres | join('|') | lower }}" data-path="{{ e.search_path }}" data-people="{{ e.people | join('|') | lower }}" data-audio="{{ e.audio_langs | join('|') }}">
+<a class="card" href="{{ e.href }}" data-kind="{{ e.kind }}" data-title="{{ e.title | lower }}" data-year="{{ e.year or '' }}" data-score="{{ '%.3f' | format(e.sort_score) }}" data-genres="{{ e.genres | join('|') | lower }}" data-path="{{ e.search_path }}" data-people="{{ e.people | join('|') | lower }}" data-audio="{{ e.audio_langs | join('|') }}" data-collection="{{ e.collection | lower }}">
 <div class="thumb thumb-{{ e.kind }}">
 {% if e.thumb %}<img src="{{ e.thumb }}" alt="" loading="lazy">{% else %}<div class="noimg">{% if e.kind == 'game' %}🎮{% elif e.kind == 'series' %}📺{% else %}🎬{% endif %}</div>{% endif %}
 {% if show_type_filter %}<span class="kind kind-{{ e.kind }}">{{ e.kind }}</span>{% endif %}
@@ -94,9 +118,9 @@ footer { text-align: center; margin-top: 30px; padding-top: 15px; border-top: 1p
 <div class="meta">
 <div class="title">{{ e.title }}</div>
 {% if e.year or e.runtime %}<div class="year">{{ e.year or "" }}{% if e.year and e.runtime %} &middot; {% endif %}{{ e.runtime or "" }}</div>{% endif %}
-{% if e.audio_langs or e.sub_langs %}<div class="tracks">{% if e.audio_langs %}<span title="audio: {{ e.audio_langs | join(', ') }}">🔊{% for l in e.audio_langs %} {{ l | lang_flag }}{% endfor %}</span>{% endif %}{% if e.sub_langs %} <span title="subtitles: {{ e.sub_langs | join(', ') }}">💬 {% if e.sub_langs | length <= 3 %}{% for l in e.sub_langs %}{{ l | lang_flag }}{% if not loop.last %} {% endif %}{% endfor %}{% else %}{{ e.sub_langs | length }}{% endif %}</span>{% endif %}</div>{% endif %}
+{% if e.audio_langs or e.sub_langs %}<div class="tracks">{% if e.audio_langs %}<span title="audio: {{ e.audio_langs | map('lang_label') | join(' ') }}">🔊{% for l in e.audio_langs %} {{ l | lang_svg }}{% endfor %}</span>{% endif %}{% if e.sub_langs %} <span title="subtitles: {{ e.sub_langs | map('lang_label') | join(' ') }}">💬 {% if e.sub_langs | length <= 3 %}{% for l in e.sub_langs %}{{ l | lang_svg }}{% if not loop.last %} {% endif %}{% endfor %}{% else %}{{ e.sub_langs | length }}{% endif %}</span>{% endif %}</div>{% endif %}
 <div class="badges">
-{% if 'tmdb' in e.ratings %}<span class="badge">TMDB <span class="score {{ e.ratings.tmdb | score_color_class }}">{{ e.ratings.tmdb }}</span></span>{% endif %}
+{% if 'tmdb' in e.ratings %}<span class="badge" title="TMDB"><span class="score {{ e.ratings.tmdb | score_color_class }}">{{ e.ratings.tmdb }}</span></span>{% endif %}
 {% if 'imdb' in e.ratings %}<span class="badge">IMDb <span class="score {{ e.ratings.imdb | score_color_class }}">{{ e.ratings.imdb }}</span></span>{% endif %}
 {% if 'rt_critics' in e.ratings %}<span class="badge">🍅 <span class="score {{ e.ratings.rt_critics | score_color_class(100) }}">{{ e.ratings.rt_critics }}%</span></span>{% endif %}
 {% if 'rt_audience' in e.ratings %}<span class="badge">🍿 <span class="score {{ e.ratings.rt_audience | score_color_class(100) }}">{{ e.ratings.rt_audience }}%</span></span>{% endif %}
@@ -117,20 +141,40 @@ footer { text-align: center; margin-top: 30px; padding-top: 15px; border-top: 1p
   var typeSel = document.getElementById("type");
   var genreSel = document.getElementById("genre");
   var langSel = document.getElementById("lang");
+  var collSel = document.getElementById("collection");
   var sortSel = document.getElementById("sort");
   var grid = document.getElementById("grid");
   var empty = document.getElementById("empty");
   var cards = Array.prototype.slice.call(grid.children);
 
+  var collator = new Intl.Collator(undefined, { numeric: true, sensitivity: "base" });
+
+  // Compare the part before the colon first: ':' outranks ' ' in any
+  // collation, which files a numbered sequel ahead of its original.
+  function compareTitle(a, b) {
+    var ia = a.indexOf(":"), ib = b.indexOf(":");
+    var ma = ia < 0 ? a : a.slice(0, ia), mb = ib < 0 ? b : b.slice(0, ib);
+    return collator.compare(ma, mb) || collator.compare(a, b);
+  }
+
   function sortVisible() {
     var mode = sortSel.value;
     var vis = cards.filter(function(c) { return c.style.display !== "none"; });
     vis.sort(function(a, b) {
-      if (mode === "year") return (parseInt(b.dataset.year) || 0) - (parseInt(a.dataset.year) || 0);
-      if (mode === "rating") return (parseFloat(b.dataset.score) || 0) - (parseFloat(a.dataset.score) || 0);
-      return a.dataset.title.localeCompare(b.dataset.title);
+      if (mode === "year") return (parseInt(b.dataset.year) || 0) - (parseInt(a.dataset.year) || 0)
+        || compareTitle(a.dataset.title, b.dataset.title);
+      if (mode === "rating") return (parseFloat(b.dataset.score) || 0) - (parseFloat(a.dataset.score) || 0)
+        || compareTitle(a.dataset.title, b.dataset.title);
+      return compareTitle(a.dataset.title, b.dataset.title);
     });
-    vis.forEach(function(c) { grid.appendChild(c); });
+    // Re-inserting every card is a full relayout — skip it when the order
+    // already holds (the page ships sorted by title, the default).
+    for (var i = 0; i < vis.length; i++) {
+      if (grid.children[i] !== vis[i]) {
+        vis.forEach(function(c) { grid.appendChild(c); });
+        break;
+      }
+    }
   }
 
   function apply() {
@@ -145,12 +189,14 @@ footer { text-align: center; margin-top: 30px; padding-top: 15px; border-top: 1p
     var t = typeSel ? typeSel.value : "all";
     var g = genreSel ? genreSel.value : "all";
     var lg = langSel ? langSel.value : "all";
+    var co = collSel ? collSel.value : "all";
     var visible = 0;
     cards.forEach(function(c) {
       var okType = (t === "all") || (c.dataset.kind === t);
       var okGenre = (g === "all") || ("|" + c.dataset.genres + "|").indexOf("|" + g + "|") !== -1;
       var okLang = (lg === "all") || ("|" + c.dataset.audio + "|").indexOf("|" + lg + "|") !== -1;
-      var hay = c.dataset.title + " " + c.dataset.path + " " + c.dataset.people;
+      var okColl = (co === "all") || (c.dataset.collection === co);
+      var hay = c.dataset.title + " " + c.dataset.path + " " + c.dataset.people + " " + c.dataset.collection;
       // Every whitespace-separated term must match somewhere ("keanu 1999"
       // = Keanu Reeves movies from 1999). A year-looking term (19/20 + at
       // least 3 digits) matches the year by prefix — "197" covers the 70s —
@@ -159,19 +205,89 @@ footer { text-align: center; margin-top: 30px; padding-top: 15px; border-top: 1p
         if (/^(19|20)\d{1,2}$/.test(term) && c.dataset.year.indexOf(term) === 0) return true;
         return hay.indexOf(term) !== -1;
       });
-      var show = okType && okGenre && okLang && okText;
+      var show = okType && okGenre && okLang && okColl && okText;
       c.style.display = show ? "" : "none";
       if (show) visible++;
     });
     empty.style.display = visible ? "none" : "block";
     sortVisible();
+    saveState();
+  }
+
+  // Filters live in the URL fragment: opening an item and coming back would
+  // otherwise land on an unfiltered grid, and a narrowed view becomes
+  // shareable. The History API is unavailable on file:// URLs, where a
+  // fragment-only location.replace() does the same job without stacking
+  // history entries.
+  var FIELDS = [["type", typeSel], ["genre", genreSel], ["lang", langSel],
+                ["collection", collSel], ["sort", sortSel]];
+  var DEFAULTS = { sort: "title" };
+  var saveTimer = null;
+
+  function stateHash() {
+    var parts = [];
+    if (search.value.trim()) parts.push("q=" + encodeURIComponent(search.value.trim()));
+    FIELDS.forEach(function(f) {
+      var el = f[1];
+      if (el && el.value !== (DEFAULTS[f[0]] || "all")) {
+        parts.push(f[0] + "=" + encodeURIComponent(el.value));
+      }
+    });
+    return parts.length ? "#" + parts.join("&") : "";
+  }
+
+  function saveState() {
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(function() {
+      var hash = stateHash();
+      if (hash === location.hash || (!hash && !location.hash)) return;
+      try {
+        history.replaceState(null, "", location.pathname + location.search + hash);
+      } catch (e) {
+        location.replace(hash || "#");
+      }
+    }, 250);
+  }
+
+  function restoreState() {
+    var raw = location.hash.replace(/^#/, "");
+    if (!raw) return;
+    raw.split("&").forEach(function(pair) {
+      var i = pair.indexOf("=");
+      var key = i < 0 ? pair : pair.slice(0, i);
+      var value = i < 0 ? "" : decodeURIComponent(pair.slice(i + 1).replace(/\+/g, " "));
+      if (key === "q") { search.value = value; return; }
+      FIELDS.forEach(function(f) {
+        // Setting an unknown value would blank the control, so check first:
+        // a catalog rebuilt without that genre must not lose its filter row.
+        if (f[0] !== key || !f[1]) return;
+        for (var o = 0; o < f[1].options.length; o++) {
+          if (f[1].options[o].value === value) { f[1].value = value; return; }
+        }
+      });
+    });
   }
 
   search.addEventListener("input", apply);
   if (typeSel) typeSel.addEventListener("change", apply);
   if (genreSel) genreSel.addEventListener("change", apply);
   if (langSel) langSel.addEventListener("change", apply);
+  if (collSel) collSel.addEventListener("change", apply);
   sortSel.addEventListener("change", apply);
+  // A page served from the back/forward cache keeps its DOM and never re-runs
+  // this script — harmless here, but re-filter in case the fragment moved.
+  window.addEventListener("pageshow", function(e) {
+    if (e.persisted) { restoreState(); apply(); }
+  });
+
+  // Nothing to restore means nothing to do: the page ships filtered by nobody
+  // and sorted by title, so running the filter here would only churn the DOM
+  // after it has been painted.
+  if (location.hash) {
+    restoreState();
+    apply();
+  }
+  document.documentElement.classList.remove("prefilter");
 })();
 </script>
 </body>

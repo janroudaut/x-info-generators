@@ -13,7 +13,7 @@ import wikipedia
 from bs4 import BeautifulSoup
 
 from ..display import DisplayMode as D
-from ..utils import run_in_executor
+from ..utils import run_in_executor, title_similarity
 from ..cli import WIKIPEDIA_USER_AGENT
 
 
@@ -128,6 +128,27 @@ def _tmdb_person(p, image_size: Optional[str] = None) -> Dict[str, Any]:
     return entry
 
 
+def _collection_name(detail: Dict[str, Any]) -> Optional[str]:
+    """Franchise a film belongs to, minus TMDB's redundant " Collection" suffix.
+
+    TMDB curates these, so they hold across a library where the sequels sit in
+    unrelated folders — and they don't mistake a release pack for a franchise.
+    """
+    name = ((detail.get("belongs_to_collection") or {}).get("name") or "").strip()
+    return re.sub(r"\s+Collection$", "", name, flags=re.IGNORECASE) or None
+
+
+async def fetch_tmdb_collection(session: aiohttp.ClientSession, tmdb_id: int, log) -> Dict[str, Any]:
+    """Backfill for pages cached before the collection was read. Always returns
+    a dict — "no franchise" is an answer worth caching."""
+    try:
+        detail = await _tmdb_get_json(session, f"/movie/{tmdb_id}")
+        return {"collection": _collection_name(detail or {})}
+    except Exception as e:
+        log(f"    {D.ERROR} TMDB: Error fetching collection for {tmdb_id}: {e}")
+        return {"collection": None}
+
+
 async def _fetch_tmdb_movie(session: aiohttp.ClientSession, tmdb_id: int, log) -> Optional[Dict[str, Any]]:
     detail = await _tmdb_get_json(session, f"/movie/{tmdb_id}", append_to_response="credits")
     if not detail:
@@ -142,6 +163,9 @@ async def _fetch_tmdb_movie(session: aiohttp.ClientSession, tmdb_id: int, log) -
     release = detail.get("release_date") or ""
     result = {
         "title": detail.get("title"),
+        "original_title": detail.get("original_title"),
+        "original_language": detail.get("original_language"),
+        "collection": _collection_name(detail),
         "year": release[:4] or None,
         "rating": _tmdb_rating(detail),
         "plot": detail.get("overview") or "Plot summary not available.",
@@ -158,18 +182,99 @@ async def _fetch_tmdb_movie(session: aiohttp.ClientSession, tmdb_id: int, log) -
     return result
 
 
+async def _fetch_tmdb_tv(session: aiohttp.ClientSession, tmdb_id: int, log) -> Optional[Dict[str, Any]]:
+    """TV detail mapped to the movie shape — for miniseries/TV specials stored
+    as movie files."""
+    detail = await _tmdb_get_json(session, f"/tv/{tmdb_id}", append_to_response="credits,external_ids")
+    if not detail:
+        return None
+    credits = detail.get("credits") or {}
+    cast = [
+        {**_tmdb_person(c, "w342"), "character": c.get("character") or None}
+        for c in (credits.get("cast") or [])[:12] if c.get("name")
+    ]
+    directors = [_tmdb_person(p) for p in detail.get("created_by") or [] if p.get("name")]
+    release = detail.get("first_air_date") or ""
+    runtime = (detail.get("episode_run_time") or [None])[0]
+    result = {
+        "title": detail.get("name"),
+        "year": release[:4] or None,
+        "rating": _tmdb_rating(detail),
+        "plot": detail.get("overview") or "Plot summary not available.",
+        "poster_url": f"{_TMDB_IMG}/w780{detail['poster_path']}" if detail.get("poster_path") else None,
+        "directors": directors,
+        "cast": cast,
+        "genres": [g["name"] for g in detail.get("genres") or [] if g.get("name")],
+        "runtime_seconds": runtime * 60 if runtime else None,
+        "imdb_id": (detail.get("external_ids") or {}).get("imdb_id"),
+        "tmdb_id": detail.get("id"),
+        "tmdb_type": "tv",
+    }
+    log(f"    {D.SUCCESS_DATA} TMDB: Found '{result['title']}' ({result['year']}, TV)")
+    return result
+
+
 async def fetch_tmdb_detail(session: aiohttp.ClientSession, imdb_id: str, log) -> Optional[Dict[str, Any]]:
-    """Fetch a movie's full metadata from TMDB via its IMDb id."""
+    """Fetch a title's full metadata from TMDB via its IMDb id."""
     try:
         media_type, hit = await _tmdb_find(session, imdb_id)
-        if media_type != "movie":
+        if media_type == "movie":
+            result = await _fetch_tmdb_movie(session, hit["id"], log)
+        elif media_type == "tv":
+            result = await _fetch_tmdb_tv(session, hit["id"], log)
+        else:
             return None
-        result = await _fetch_tmdb_movie(session, hit["id"], log)
         if result and not result.get("imdb_id"):
             result["imdb_id"] = imdb_id
         return result
     except Exception as e:
         log(f"    {D.ERROR} TMDB: Error fetching detail for {imdb_id}: {e}")
+        return None
+
+
+async def fetch_tmdb_fr_details(session: aiohttp.ClientSession, tmdb_id: int, log) -> Optional[Dict[str, Any]]:
+    """French synopsis and poster. TMDB returns an empty overview — not the
+    English text — for an untranslated title, but always a poster (the default
+    one when there is no French artwork)."""
+    try:
+        detail = await _tmdb_get_json(session, f"/movie/{tmdb_id}", language="fr-FR")
+        if not detail:
+            return None
+        result = {}
+        if (detail.get("overview") or "").strip():
+            result["plot"] = detail["overview"].strip()
+        if detail.get("poster_path"):
+            result["poster_url"] = f"{_TMDB_IMG}/w780{detail['poster_path']}"
+        if result:
+            log(f"    {D.SUCCESS_DATA} TMDB: French {' + '.join(sorted(result))} found.")
+        return result or None
+    except Exception as e:
+        log(f"    {D.ERROR} TMDB: Error fetching French details for {tmdb_id}: {e}")
+        return None
+
+
+async def fetch_tmdb_specific_title(session: aiohttp.ClientSession, tmdb_id: int,
+                                    tmdb_title: str, filename_title: str, log) -> Optional[str]:
+    """An alternative TMDB title closer to what the filename says, or None.
+
+    TMDB's canonical title is sometimes the short form; the alternative-titles
+    list holds the properly punctuated long one the filename is naming.
+    """
+    try:
+        data = await _tmdb_get_json(session, f"/movie/{tmdb_id}/alternative_titles")
+        # The list also holds scene release names ("Star.Wars.Episode.IV.A.New.Hope"),
+        # which score *better* than the real title against a filename.
+        alts = [t["title"] for t in (data or {}).get("titles") or []
+                if t.get("title") and " " in t["title"] and not re.search(r"\w\.\w", t["title"])]
+        scored = [(title_similarity(filename_title, a), a) for a in alts]
+        scored = [(s, a) for s, a in scored if s >= 0.85 and len(a) > len(tmdb_title)]
+        if not scored:
+            return None
+        best = max(scored, key=lambda t: (t[0], -len(t[1])))[1]
+        log(f"    {D.SUCCESS_DATA} TMDB: using fuller title '{best}'.")
+        return best
+    except Exception as e:
+        log(f"    {D.ERROR} TMDB: Error fetching alternative titles for {tmdb_id}: {e}")
         return None
 
 
@@ -213,21 +318,50 @@ async def fetch_tmdb_stills(session: aiohttp.ClientSession, imdb_id: str, n: int
         return None
 
 
-async def fetch_tmdb_search(session: aiohttp.ClientSession, title: str, year: Optional[str], log) -> Optional[Dict[str, Any]]:
-    """Fallback movie lookup via TMDB search (when Wikidata yields no IMDb id)."""
+def _pick_search_result(title: str, year: Optional[str], results, threshold: float):
+    """Best result by title similarity (against both localized and original
+    titles), or None when even the best is below ``threshold``."""
+    scored = []
+    for r in results:
+        sim = max(title_similarity(title, r.get("title")),
+                  title_similarity(title, r.get("original_title")))
+        ry = (r.get("release_date") or "")[:4]
+        bonus = 0.1 if year and ry and abs(int(ry) - int(year)) <= 1 else 0.0
+        scored.append((sim + bonus, sim, r.get("popularity") or 0.0, r))
+    scored.sort(key=lambda t: (t[0], t[2]), reverse=True)
+    return scored[0] if scored and scored[0][1] >= threshold else None
+
+
+async def fetch_tmdb_search(session: aiohttp.ClientSession, title: str, year: Optional[str], log,
+                            lang: Optional[str] = None) -> Optional[Dict[str, Any]]:
+    """Fallback movie lookup via TMDB search (when Wikidata yields no IMDb id).
+
+    ``lang`` localizes the returned titles (e.g. a FRENCH-tagged release was
+    named after the French title), so similarity is computed against the same
+    language the filename uses. Candidates are scored, not taken blindly; the
+    year-less retry demands a stricter match since the year can no longer
+    disambiguate homonyms.
+    """
     log(f"    {D.QUERY} TMDB: Searching for '{title}' ({year or 'N/A'})...")
     try:
         params = {"query": title}
+        if lang:
+            params["language"] = lang
+            params["region"] = lang.upper()
+        best = None
         if year:
-            params["primary_release_year"] = year
-        data = await _tmdb_get_json(session, "/search/movie", **params)
-        results = (data or {}).get("results") or []
-        if not results and year:  # year too strict? retry without it
-            data = await _tmdb_get_json(session, "/search/movie", query=title)
-            results = (data or {}).get("results") or []
-        if not results:
+            data = await _tmdb_get_json(session, "/search/movie", primary_release_year=year, **params)
+            best = _pick_search_result(title, year, (data or {}).get("results") or [], 0.6)
+        if not best:
+            data = await _tmdb_get_json(session, "/search/movie", **params)
+            best = _pick_search_result(title, year, (data or {}).get("results") or [], 0.75)
+        if not best:
+            log(f"    {D.SHRUG} TMDB: no confident match for '{title}'.")
             return None
-        return await _fetch_tmdb_movie(session, results[0]["id"], log)
+        _, sim, _, r = best
+        log(f"    {D.QUERY} TMDB: best match '{r.get('title')}' "
+            f"({(r.get('release_date') or '????')[:4]}), similarity {sim:.2f}")
+        return await _fetch_tmdb_movie(session, r["id"], log)
     except Exception as e:
         log(f"    {D.ERROR} TMDB: Error querying: {e}")
         return None
@@ -296,6 +430,12 @@ async def _wikidata_pick_film(session, qids: List[str], year: Optional[str]) -> 
         for imdb, y in films:
             if y == str(year):
                 return imdb
+        # A candidate whose known year disagrees by >1 is a different film
+        # (homonyms, translated labels) — better no id than a wrong one; the
+        # non-film fallback is even less trustworthy here.
+        close = [imdb for imdb, y in films
+                 if y is None or abs(int(y) - int(year)) <= 1]
+        return close[0] if close else None
     return films[0][0] if films else fallback
 
 
@@ -405,19 +545,43 @@ async def fetch_tvmaze_series(session: aiohttp.ClientSession, title: str, log) -
 
 # --- FFmpeg screenshots ---
 
+def _playable_duration(probe) -> Optional[float]:
+    """Shortest of the container and video-stream durations.
+
+    A broken audio stream can push ``format.duration`` far past the last video
+    frame (seeking there yields no frame at all); Matroska, conversely, reports
+    no per-stream duration, so neither source can be trusted alone.
+    """
+    candidates = []
+    for raw in [(probe.get("format") or {}).get("duration")] + [
+        s.get("duration") for s in probe.get("streams") or [] if s.get("codec_type") == "video"
+    ]:
+        try:
+            value = float(raw)
+        except (TypeError, ValueError):
+            continue
+        if value > 0:
+            candidates.append(value)
+    return min(candidates) if candidates else None
+
+
 def _sync_generate_screenshots(video_path: Path, output_dir: Path, num_screenshots: int = 4) -> List[Path]:
-    probe = ffmpeg.probe(str(video_path))
-    duration = float(probe["format"]["duration"])
+    duration = _playable_duration(ffmpeg.probe(str(video_path)))
+    if not duration:
+        raise ValueError("no usable duration")
     screenshot_paths = []
     for i in range(num_screenshots):
         timestamp = duration * ((i + 1) / (num_screenshots + 1))
         output_file = output_dir / f"screenshot_{i + 1}.jpg"
-        (
-            ffmpeg.input(str(video_path), ss=timestamp)
-            .output(str(output_file), vframes=1, **{"q:v": 3})
-            .overwrite_output()
-            .run(capture_stdout=True, capture_stderr=True)
-        )
+        try:
+            (
+                ffmpeg.input(str(video_path), ss=timestamp)
+                .output(str(output_file), vframes=1, **{"q:v": 3})
+                .overwrite_output()
+                .run(capture_stdout=True, capture_stderr=True)
+            )
+        except ffmpeg.Error:
+            continue  # unreadable spot (truncated file, bad seek) — keep the rest
         screenshot_paths.append(output_file)
     return screenshot_paths
 
@@ -428,16 +592,20 @@ async def generate_screenshots_async(video_path: Path, temp_dir: Path, num_scree
     log(f"    {D.FFMPEG} FFmpeg: Generating {num_screenshots} screenshots...")
     try:
         screenshot_paths = await run_in_executor(_sync_generate_screenshots, video_path, temp_dir, num_screenshots)
-        if screenshot_paths:
+        if len(screenshot_paths) == num_screenshots:
             log(f"    {D.SUCCESS_DATA} FFmpeg: Generated {len(screenshot_paths)} screenshots.")
-            return screenshot_paths
+        elif screenshot_paths:
+            log(f"    {D.WARNING} FFmpeg: Generated {len(screenshot_paths)}/{num_screenshots} screenshots.")
         else:
             log(f"    {D.WARNING} FFmpeg: Screenshot generation produced no files.")
-            return []
+        return screenshot_paths
     except ffmpeg.Error as e:
         stderr_output = e.stderr.decode(errors="ignore").strip() if e.stderr else "No stderr output."
         log(f"    {D.ERROR} FFmpeg: Failed to generate screenshots.")
         log(f"      {D.C_RED}FFmpeg Error: {stderr_output}{D.C_RESET}")
+        return []
+    except Exception as e:
+        log(f"    {D.ERROR} FFmpeg: Failed to generate screenshots: {e}")
         return []
 
 
@@ -555,22 +723,36 @@ async def fetch_rotten_tomatoes_data(session: aiohttp.ClientSession, title: str,
 
 # --- Wikipedia ---
 
-def _sync_fetch_wikipedia_summary(title: str, year: Optional[str], kind: str):
+def _sync_fetch_wikipedia_summary(title: str, year: Optional[str], kind: str, lang: str = "en"):
     category_keyword = "television" if kind == "series" else "film"
-    descriptor = "TV series" if kind == "series" else "film"
-    try:
+    if lang == "fr":
+        search_term = f"{title} (film, {year})" if year else f"{title} (film)"
+    else:
+        descriptor = "TV series" if kind == "series" else "film"
         search_term = f"{title} ({year} {descriptor})" if year else f"{title} ({descriptor})"
+    try:
+        wikipedia.set_lang(lang)
         page = wikipedia.page(search_term, auto_suggest=True, redirect=True)
         if any(category_keyword in cat.lower() for cat in page.categories):
             return {"wikipedia_url": page.url, "wikipedia_summary": page.summary}
         return None
     except (wikipedia.exceptions.PageError, wikipedia.exceptions.DisambiguationError):
         return None
+    finally:
+        wikipedia.set_lang("en")  # module-wide global, inherited by every later query
 
 
-async def fetch_wikipedia_data(title: str, year: Optional[str], log, kind: str = "film") -> Optional[Dict[str, Any]]:
+async def fetch_wikipedia_data(title: str, year: Optional[str], log, kind: str = "film",
+                               lang: Optional[str] = None,
+                               fallback_title: Optional[str] = None) -> Optional[Dict[str, Any]]:
     log(f"    {D.QUERY} Wikipedia: Querying for '{title}'...")
-    return await run_in_executor(_sync_fetch_wikipedia_summary, title, year, kind)
+    if lang and lang != "en":
+        data = await run_in_executor(_sync_fetch_wikipedia_summary, title, year, kind, lang)
+        if data:
+            return data
+        title = fallback_title or title
+        log(f"    {D.QUERY} Wikipedia: no {lang} page — retrying '{title}' in English...")
+    return await run_in_executor(_sync_fetch_wikipedia_summary, title, year, kind, "en")
 
 
 # --- YouTube ---
@@ -607,17 +789,21 @@ async def _fetch_youtube_videos(session: aiohttp.ClientSession, search_query: st
     return videos
 
 
-async def fetch_youtube_trailer(session: aiohttp.ClientSession, title: str, year: Optional[str], log) -> Optional[Dict[str, Any]]:
+async def fetch_youtube_trailer(session: aiohttp.ClientSession, title: str, year: Optional[str], log,
+                                lang: Optional[str] = None) -> Optional[Dict[str, Any]]:
     log(f"    {D.TRAILER} YouTube: Querying for official trailer...")
-    search_query = f"{title} {year} official trailer"
+    keywords = "bande-annonce officielle" if lang == "fr" else "official trailer"
+    search_query = f"{title} {year} {keywords}"
     videos = await _fetch_youtube_videos(session, search_query, 1)
     if videos:
         return {"youtube_trailer_url": f"https://www.youtube.com/watch?v={videos[0]['id']}"}
     return None
 
 
-async def fetch_youtube_reviews(session: aiohttp.ClientSession, title: str, year: Optional[str], log, max_videos: int = 4) -> Optional[Dict[str, Any]]:
+async def fetch_youtube_reviews(session: aiohttp.ClientSession, title: str, year: Optional[str], log,
+                                max_videos: int = 4, lang: Optional[str] = None) -> Optional[Dict[str, Any]]:
     log(f"    {D.YOUTUBE} YouTube: Querying for reviews/trivia...")
-    search_query = f"{title} {year} review analysis trivia"
+    keywords = "critique analyse anecdotes" if lang == "fr" else "review analysis trivia"
+    search_query = f"{title} {year} {keywords}"
     videos = await _fetch_youtube_videos(session, search_query, max_videos)
     return {"youtube_reviews": videos} if videos else None

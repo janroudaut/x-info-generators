@@ -18,9 +18,10 @@ Recognised hooks:
 import os
 import re
 import time
+import unicodedata
 import urllib.parse
 from pathlib import Path
-from typing import Callable, Dict, List, Optional, Tuple
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from bs4 import BeautifulSoup
 from tqdm import tqdm
@@ -192,9 +193,31 @@ def parse_page(html_path: Path) -> Optional[Dict]:
         "runtime": runtime,
         "ratings": _parse_ratings(soup, kind),
         "genres": genres,
+        "collection": rows.get("collection") or "",
         "thumb": thumb,
         "html_path": str(html_path),
     }
+
+
+def _fold(text: str) -> str:
+    """Case- and accent-insensitive form, matching the browser collator's "base"
+    sensitivity — otherwise an accented initial sorts past "z" and lands last."""
+    decomposed = unicodedata.normalize("NFKD", text)
+    return "".join(c for c in decomposed if not unicodedata.combining(c)).casefold()
+
+
+def _natural_key(text: str):
+    """Digit runs compare as numbers, so "Rocky 2" precedes "Rocky 10" — and
+    sort ahead of letters, as a numeric collator does."""
+    return [(0, int(p), "") if p.isdigit() else (1, 0, p)
+            for p in re.split(r'(\d+)', _fold(text)) if p]
+
+
+def _title_sort_key(entry: Dict[str, Any]):
+    """Sequels file behind their original: the part before the colon leads,
+    since ':' outranks ' 2' in a plain sort."""
+    title = entry["title"]
+    return _natural_key(title.split(":", 1)[0]), _natural_key(title)
 
 
 def _sort_score(ratings: Dict[str, float]) -> float:
@@ -329,7 +352,7 @@ def build_catalog(roots, output_path, log: Callable, max_depth: int = 5,
     bar.close()
 
     log(f"{D.INFO} Recognized {len(entries)} page(s), skipped {skipped} (season/other).")
-    entries.sort(key=lambda e: e["title"].lower())
+    entries.sort(key=_title_sort_key)
     log(f"{D.PROCESS} Rendering catalog → {output_path}")
 
     # With a single kind present, default the title to that kind and drop the type
@@ -350,6 +373,18 @@ def build_catalog(roots, output_path, log: Callable, max_depth: int = 5,
     all_genres = [{"value": k, "label": genre_display[k], "count": genre_counts[k]}
                   for k in sorted(genre_display)]
 
+    # Franchise filter: TMDB's curated collections, which hold even when the
+    # sequels live in unrelated folders.
+    coll_display: Dict[str, str] = {}
+    coll_counts: Dict[str, int] = {}
+    for e in entries:
+        if e["collection"]:
+            key = e["collection"].lower()
+            coll_display.setdefault(key, e["collection"])
+            coll_counts[key] = coll_counts.get(key, 0) + 1
+    all_collections = [{"value": k, "label": coll_display[k], "count": coll_counts[k]}
+                       for k in sorted(coll_display) if coll_counts[k] > 1]
+
     lang_counts: Dict[str, int] = {}
     for e in entries:
         for lang in e["audio_langs"]:
@@ -363,6 +398,7 @@ def build_catalog(roots, output_path, log: Callable, max_depth: int = 5,
         total=len(entries),
         title=title,
         all_genres=all_genres,
+        all_collections=all_collections,
         all_audio_langs=all_audio_langs,
         show_type_filter=len(present_kinds) > 1,
         generator_name="CatalogIndexGenerator",
