@@ -3,7 +3,7 @@ import re
 import jinja2
 from markupsafe import Markup, escape
 
-from .utils import lang_emoji, lang_label, lang_svg
+from .utils import lang_emoji, lang_label, lang_name, lang_svg
 
 
 def _get_env():
@@ -19,6 +19,7 @@ def _get_env():
     env.filters["lang_label"] = lang_label
     env.filters["lang_svg"] = lambda code: Markup(lang_svg(code))
     env.filters["lang_emoji"] = lang_emoji
+    env.filters["lang_name"] = lang_name
     env.filters["genre_icon"] = genre_icon
     return env
 

@@ -154,6 +154,30 @@ def lang_label(code: Optional[str]) -> str:
     return "?" if code in ("", "und") else code.upper()
 
 
+_LANG_NAMES = {
+    "eng": "English", "fre": "French", "spa": "Spanish", "ger": "German",
+    "ita": "Italian", "jpn": "Japanese", "rus": "Russian", "por": "Portuguese",
+    "dut": "Dutch", "chi": "Chinese", "kor": "Korean", "ara": "Arabic",
+    "swe": "Swedish", "dan": "Danish", "nor": "Norwegian", "fin": "Finnish",
+    "pol": "Polish", "cze": "Czech", "hun": "Hungarian", "tur": "Turkish",
+    "gre": "Greek", "heb": "Hebrew", "hin": "Hindi", "tha": "Thai",
+    "vie": "Vietnamese", "ind": "Indonesian", "may": "Malay", "rum": "Romanian",
+    "ukr": "Ukrainian", "bul": "Bulgarian", "hrv": "Croatian", "srp": "Serbian",
+    "slo": "Slovak", "slv": "Slovenian", "est": "Estonian", "lav": "Latvian",
+    "lit": "Lithuanian", "ice": "Icelandic", "tam": "Tamil", "tel": "Telugu",
+    "ben": "Bengali", "urd": "Urdu", "per": "Persian",
+}
+
+
+def lang_name(code) -> str:
+    """Full language name for menus. Falls back to the bare code, which beats
+    inventing a name for something we don't know."""
+    code = canon_lang(code)
+    if code in ("", "und"):
+        return "Undetermined"
+    return _LANG_NAMES.get(code, code.upper())
+
+
 # Country whose flag stands for the language, mirroring flags.py's coverage.
 _LANG_REGION = {
     "ara": "SA", "ben": "BD", "bul": "BG", "chi": "CN", "cze": "CZ",

@@ -16,10 +16,12 @@ This project adheres to [Semantic Versioning](https://semver.org/).
   for an extra — it is not a released title, and searching for one only ever
   resolves to something else. Before this, a making-of was handed the film's own
   page: its director, its runtime, its plot, for a page three times the size.
-- **Flags in the catalog's audio-language filter.** A `<select>` cannot hold the
-  SVG artwork used on the cards, so these are emoji; Windows ships no flag
-  glyphs and will show the letter pair instead, which is the trade-off for
-  having them there at all. A language with no flag gets no placeholder.
+- **Flags and spelled-out names in the catalog's audio-language filter.** A
+  `<select>` cannot hold the SVG artwork used on the cards, so these are emoji;
+  Windows ships no flag glyphs and will show the letter pair instead, which is
+  the trade-off for having them there at all. A language with no flag gets no
+  placeholder. Entries read "English", not "ENG": the three-letter code suits
+  the cards' tooltips, where room is scarce, not a menu.
 - **Filter by publisher in the catalog.** Only studios holding more than one
   title are listed — a filter whose every entry selects a single item is a
   list, not a filter. Developers get no dropdown of their own for that exact

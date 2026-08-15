@@ -110,7 +110,7 @@ if (location.hash) {
 {% if all_audio_langs %}
 <select id="lang">
 <option value="all">All languages</option>
-{% for l in all_audio_langs %}<option value="{{ l.value }}">{% set fl = l.value | lang_emoji %}{% if fl %}{{ fl }} {% endif %}{{ l.value | lang_label }} ({{ l.count }})</option>
+{% for l in all_audio_langs %}<option value="{{ l.value }}">{% set fl = l.value | lang_emoji %}{% if fl %}{{ fl }} {% endif %}{{ l.value | lang_name }} ({{ l.count }})</option>
 {% endfor %}</select>
 {% endif %}
 <select id="sort">
