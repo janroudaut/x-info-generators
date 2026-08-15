@@ -5,6 +5,8 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.7.0] — 2026-08-15
+
 ### Added
 - **Extras get their own place.** A `Bonus/` folder next to a film (or at a
   series root — `Extra/` and `Extras/` are read too) is no longer catalogued as
