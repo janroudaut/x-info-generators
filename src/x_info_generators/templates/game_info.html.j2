@@ -24,6 +24,7 @@ p { margin-bottom: 1em; }
 .star-rating { font-size: 1.2em; color: #ffc107; margin-left: 5px; }
 .star.empty { color: #555; }
 .details-table th { width: 35%; }
+.genre { white-space: nowrap; }
 @media (max-width: 768px) {
   .section-box { padding: 15px; margin-bottom: 15px; }
   .description-content { padding: 12px; }
@@ -98,7 +99,7 @@ p { margin-bottom: 1em; }
 {% if data.release_date %}<tr><th>Released:</th><td>{{ data.release_date }}</td></tr>{% endif %}
 {% if data.developers %}<tr><th>Developers:</th><td>{{ data.developers | join(", ") }}</td></tr>{% endif %}
 {% if data.publishers %}<tr><th>Publishers:</th><td>{{ data.publishers | join(", ") }}</td></tr>{% endif %}
-{% if data.genres %}<tr><th>Genres:</th><td>{{ data.genres | join(", ") }}</td></tr>{% endif %}
+{% if data.genres %}<tr><th>Genres:</th><td data-genres="{{ data.genres | join('|') }}">{% for g in data.genres %}{% if not loop.first %}, {% endif %}<span class="genre">{% set icon = g | genre_icon %}{% if icon %}{{ icon }} {% endif %}{{ g }}</span>{% endfor %}</td></tr>{% endif %}
 </table>
 {% else %}
 <p>No specific game details available.</p>

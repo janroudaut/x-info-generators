@@ -15,11 +15,22 @@ section > h2:first-child { margin-top: 0; }
 img { max-width: 100%; height: auto; }
 .description-content img, .description-content video { display: block; max-width: 100% !important; width: auto !important; height: auto !important; border-radius: 4px; margin: 10px 0; }
 .media-wrapper { position: relative; display: inline-block; max-width: 100%; }
-.description-content .media-wrapper { display: block; }
+/* Shrink to the media: a full-width wrapper would put the centred overlay off
+   to the side of a picture narrower than the column. */
+.description-content .media-wrapper { display: block; width: fit-content; }
 .media-wrapper img, .media-wrapper video, .media-wrapper canvas { display: block; max-width: 100% !important; height: auto !important; }
 .media-wrapper canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
-.media-toggle { position: absolute; top: 8px; right: 8px; background: rgba(0,0,0,0.7); color: white; border: 2px solid rgba(255,255,255,0.3); border-radius: 50%; width: 36px; height: 36px; font-size: 16px; cursor: pointer; opacity: 0.7; z-index: 2; display: flex; align-items: center; justify-content: center; transition: opacity 0.2s; }
-.media-toggle:hover { opacity: 1; background: rgba(0,0,0,0.9); }
+/* Store descriptions bake their section headings into a picture sitting on a
+   flat plate, which reads as a slab pasted over the page. The plate is flattened
+   to pure black at generation time, so this drops it exactly. */
+.bb-blend { mix-blend-mode: screen; }
+.media-wrapper.media-playable { cursor: pointer; }
+.media-toggle { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 20%; min-width: 44px; max-width: 78px; aspect-ratio: 1; padding: 0; background: rgba(0,0,0,0.55); color: white; border: 2px solid rgba(255,255,255,0.6); border-radius: 50%; cursor: pointer; opacity: 0.85; z-index: 2; display: flex; align-items: center; justify-content: center; transition: opacity 0.2s, background 0.2s; }
+.media-toggle svg { width: 40%; height: 40%; fill: currentColor; pointer-events: none; }
+.media-wrapper:hover .media-toggle { opacity: 1; background: rgba(0,0,0,0.75); }
+/* Playing: the overlay clears the picture entirely — pausing is a click on the
+   media itself, so there is nothing left to prompt. */
+.media-wrapper.playing .media-toggle { opacity: 0; pointer-events: none; }
 .lightbox-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.92); z-index: 1000; justify-content: center; align-items: center; cursor: zoom-out; }
 .lightbox-overlay.active { display: flex; }
 .lightbox-overlay img { max-width: 95vw; max-height: 95vh; object-fit: contain; border-radius: 4px; cursor: default; }
@@ -96,52 +107,57 @@ footer { text-align: center; margin-top: 30px; padding-top: 15px; border-top: 1p
 </div>
 <script>
 (function() {
-  /* --- GIF toggle --- */
-  document.querySelectorAll('img[src^="data:image/gif"]').forEach(function(img) {
+  /* --- Play/pause overlay (animated images and videos) --- */
+  var PLAY_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>';
+
+  function wrapMedia(el) {
     var wrapper = document.createElement("div");
-    wrapper.className = "media-wrapper";
-    img.parentNode.insertBefore(wrapper, img);
-    wrapper.appendChild(img);
-    var canvas = document.createElement("canvas");
+    wrapper.className = "media-wrapper media-playable";
+    el.parentNode.insertBefore(wrapper, el);
+    wrapper.appendChild(el);
+    return wrapper;
+  }
+
+  function addPlayOverlay(wrapper, start, stop) {
     var btn = document.createElement("button");
     btn.className = "media-toggle";
-    btn.textContent = "\u25B6";
-    btn.title = "Play/Pause GIF";
-    var paused = true;
-    function captureFrame() {
+    btn.title = "Play/Pause";
+    btn.innerHTML = PLAY_ICON;
+    wrapper.appendChild(btn);
+    var playing = false;
+    // The whole media is the click target, so the wrapper owns the handler \u2014
+    // binding the button too would toggle twice on a click that hits it.
+    wrapper.addEventListener("click", function(e) {
+      e.preventDefault(); e.stopPropagation();
+      playing = !playing;
+      if (playing) { start(); } else { stop(); }
+      wrapper.classList.toggle("playing", playing);
+    });
+  }
+
+  document.querySelectorAll('img[src^="data:image/gif"], img[src^="data:image/avif"]').forEach(function(img) {
+    var wrapper = wrapMedia(img);
+    // An animated image can't be paused: a still of the current frame is laid
+    // over it instead, and removed to reveal the animation still running.
+    var canvas = document.createElement("canvas");
+    canvas.style.display = "none";
+    wrapper.appendChild(canvas);
+    function freeze() {
       canvas.width = img.naturalWidth;
       canvas.height = img.naturalHeight;
       canvas.getContext("2d").drawImage(img, 0, 0);
-      wrapper.insertBefore(canvas, btn);
+      canvas.style.display = "";
     }
-    if (img.complete && img.naturalWidth > 0) { captureFrame(); }
-    else { img.addEventListener("load", function onLoad() { img.removeEventListener("load", onLoad); captureFrame(); }); }
-    wrapper.appendChild(btn);
-    btn.addEventListener("click", function(e) {
-      e.preventDefault(); e.stopPropagation();
-      if (paused) { canvas.style.display = "none"; btn.textContent = "\u23F8"; paused = false; }
-      else { captureFrame(); canvas.style.display = ""; btn.textContent = "\u25B6"; paused = true; }
-    });
+    if (img.complete && img.naturalWidth > 0) { freeze(); }
+    else { img.addEventListener("load", freeze, { once: true }); }
+    addPlayOverlay(wrapper, function() { canvas.style.display = "none"; }, freeze);
   });
 
-  /* --- Video toggle --- */
   document.querySelectorAll(".description-content video[loop]").forEach(function(video) {
     video.removeAttribute("autoplay");
     video.pause();
-    var wrapper = document.createElement("div");
-    wrapper.className = "media-wrapper";
-    video.parentNode.insertBefore(wrapper, video);
-    wrapper.appendChild(video);
-    var btn = document.createElement("button");
-    btn.className = "media-toggle";
-    btn.textContent = "\u25B6";
-    btn.title = "Play/Pause";
-    wrapper.appendChild(btn);
-    btn.addEventListener("click", function(e) {
-      e.preventDefault(); e.stopPropagation();
-      if (video.paused) { video.play(); btn.textContent = "\u23F8"; }
-      else { video.pause(); btn.textContent = "\u25B6"; }
-    });
+    var wrapper = wrapMedia(video);
+    addPlayOverlay(wrapper, function() { video.play(); }, function() { video.pause(); });
   });
 
   /* --- Lightbox --- */

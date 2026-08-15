@@ -47,6 +47,24 @@ def _num(text: str) -> Optional[float]:
     return float(m.group()) if m else None
 
 
+_LEGAL_SUFFIX_RE = re.compile(
+    r"^(?:inc|llc|l\.?p|ltd|co|corp|s\.?a(?:\.?s)?|gmbh|ab|a/?s|bv|srl|k\.?k|pty|plc|oy|"
+    r"sp\.? ?z ?o\.?o)\.?$", re.I)
+
+
+def _split_companies(value: str) -> List[str]:
+    """Split a comma-joined studio list, keeping ", Inc."-style suffixes attached."""
+    parts: List[str] = []
+    for chunk in (v.strip() for v in (value or "").split(",")):
+        if not chunk:
+            continue
+        if parts and _LEGAL_SUFFIX_RE.match(chunk):
+            parts[-1] += f", {chunk}"
+        else:
+            parts.append(chunk)
+    return parts
+
+
 def _details_rows(soup) -> Dict[str, str]:
     """Map detail-table headers (lowercased, no trailing ':') to their values."""
     rows: Dict[str, str] = {}
@@ -128,10 +146,14 @@ def parse_page(html_path: Path) -> Optional[Dict]:
         title = re.sub(r"\s*\(" + re.escape(year) + r"\)\s*$", "", title).strip()
 
     rows = _details_rows(soup)
+    # The genre cell may carry decorations (icons) alongside the names, so the
+    # machine-readable attribute wins over its text; pages predating it have none.
     genres = []
-    grow = rows.get("genres")
-    if grow:
-        genres = [g.strip() for g in grow.split(",") if g.strip()]
+    gcell = soup.select_one("td[data-genres]")
+    if gcell:
+        genres = [g.strip() for g in (gcell.get("data-genres") or "").split("|") if g.strip()]
+    elif rows.get("genres"):
+        genres = [g.strip() for g in rows["genres"].split(",") if g.strip()]
 
     # Movies expose "Runtime" (e.g. "1h 21min"); series expose "Episode length"
     # (e.g. "~30 min"). The value is already display-formatted by the templates.
@@ -142,18 +164,22 @@ def parse_page(html_path: Path) -> Optional[Dict]:
     if img and img.get("src"):
         thumb = downscale_data_uri(img["src"])
 
-    # People the search box can match: directors + cast — videos only (matching
-    # a game by its studio isn't useful).
+    developers = _split_companies(rows.get("developers", ""))
+    publishers = _split_companies(rows.get("publishers", ""))
+
+    # Names the search box can match: studios for games, directors + cast for videos.
     people = []
-    if kind != "game":
+    if kind == "game":
+        people = developers + publishers
+    else:
         if "director(s)" in rows:
             people += [p.strip() for p in rows["director(s)"].split(",") if p.strip()]
         for el in soup.select(".cast-list .cast-info"):
             name_el = el.select_one("a, span:not(.cast-char)")
             if name_el:
                 people.append(name_el.get_text(strip=True))
-        seen = set()
-        people = [p for p in people if not (p.lower() in seen or seen.add(p.lower()))]
+    seen = set()
+    people = [p for p in people if not (p.lower() in seen or seen.add(p.lower()))]
 
     def _langs(attr):
         el = soup.select_one(f"[{attr}]")
@@ -193,6 +219,7 @@ def parse_page(html_path: Path) -> Optional[Dict]:
         "runtime": runtime,
         "ratings": _parse_ratings(soup, kind),
         "genres": genres,
+        "publishers": publishers,
         "collection": rows.get("collection") or "",
         "thumb": thumb,
         "html_path": str(html_path),
@@ -361,6 +388,16 @@ def build_catalog(roots, output_path, log: Callable, max_depth: int = 5,
     if title is None:
         title = _KIND_TITLE[present_kinds[0]] if len(present_kinds) == 1 else "Catalog"
 
+    # What the search box actually matches depends on the kinds present:
+    # studios for games, folder and cast for videos.
+    has_video = bool(by_kind["movie"] or by_kind["series"])
+    hints = ["title"]
+    if by_kind["game"]:
+        hints += ["studio"] if has_video else ["developer", "publisher"]
+    if has_video:
+        hints += ["folder", "cast"]
+    search_placeholder = "Search " + ", ".join(hints + ["year"]) + "…"
+
     # Genre filter data: dedupe case-insensitively but keep the first-seen
     # display casing, count occurrences, sort alphabetically.
     genre_display: Dict[str, str] = {}
@@ -385,6 +422,18 @@ def build_catalog(roots, output_path, log: Callable, max_depth: int = 5,
     all_collections = [{"value": k, "label": coll_display[k], "count": coll_counts[k]}
                        for k in sorted(coll_display) if coll_counts[k] > 1]
 
+    # Publisher filter (games). Studios with a single title are left out: they
+    # would be almost every entry, and the search box already matches them.
+    pub_display: Dict[str, str] = {}
+    pub_counts: Dict[str, int] = {}
+    for e in entries:
+        for p in e["publishers"]:
+            key = p.lower()
+            pub_display.setdefault(key, p)
+            pub_counts[key] = pub_counts.get(key, 0) + 1
+    all_publishers = [{"value": k, "label": pub_display[k], "count": pub_counts[k]}
+                      for k in sorted(pub_display) if pub_counts[k] > 1]
+
     lang_counts: Dict[str, int] = {}
     for e in entries:
         for lang in e["audio_langs"]:
@@ -399,6 +448,8 @@ def build_catalog(roots, output_path, log: Callable, max_depth: int = 5,
         title=title,
         all_genres=all_genres,
         all_collections=all_collections,
+        all_publishers=all_publishers,
+        search_placeholder=search_placeholder,
         all_audio_langs=all_audio_langs,
         show_type_filter=len(present_kinds) > 1,
         generator_name="CatalogIndexGenerator",

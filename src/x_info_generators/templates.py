@@ -3,7 +3,7 @@ import re
 import jinja2
 from markupsafe import Markup, escape
 
-from .utils import lang_label, lang_svg
+from .utils import lang_emoji, lang_label, lang_svg
 
 
 def _get_env():
@@ -18,7 +18,32 @@ def _get_env():
     env.filters["format_duration"] = format_duration
     env.filters["lang_label"] = lang_label
     env.filters["lang_svg"] = lambda code: Markup(lang_svg(code))
+    env.filters["lang_emoji"] = lang_emoji
+    env.filters["genre_icon"] = genre_icon
     return env
+
+
+# Two closed vocabularies: Steam's for games, TMDB's for video. They only
+# overlap on action/adventure — covering just one left most video cards iconless.
+# Anything outside both gets no icon rather than a wrong one.
+_GENRE_ICONS = {
+    # Steam
+    "action": "⚔️", "adventure": "🗺️", "casual": "☕", "early access": "🚧",
+    "free to play": "🆓", "indie": "🕹️", "massively multiplayer": "🌐",
+    "racing": "🏎️", "rpg": "🐉", "simulation": "🎛️", "sports": "⚽",
+    "strategy": "♟️", "violent": "🔞", "gore": "🔞", "nudity": "🔞",
+    "sexual content": "🔞",
+    # TMDB
+    "animation": "🎨", "comedy": "😄", "crime": "🚔", "documentary": "🎥",
+    "drama": "🎭", "family": "👨‍👩‍👧", "fantasy": "🧙", "history": "🏛️",
+    "horror": "👻", "music": "🎵", "mystery": "🔍", "romance": "💗",
+    "science fiction": "🚀", "sci-fi": "🚀", "thriller": "🔪",
+    "tv movie": "📺", "war": "🎖️", "western": "🤠",
+}
+
+
+def genre_icon(name) -> str:
+    return _GENRE_ICONS.get(str(name).strip().lower(), "")
 
 
 def format_duration(seconds):

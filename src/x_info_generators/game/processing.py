@@ -11,7 +11,7 @@ import aiohttp
 from bs4 import BeautifulSoup
 
 from ..display import DisplayMode as D
-from ..images import cached_image_data_uri
+from ..images import cached_image_data_uri, flatten_banner
 from ..processing import ItemStats
 from ..templates import render_template
 from .. import __version__
@@ -21,6 +21,52 @@ from .fetchers import (
 )
 
 DEFAULT_HTML_FILENAME = "00_GAME_INFO.html"
+
+# Store launchers nest their games under an intermediate folder ("<Store>/Library/
+# <game>"), and system folders sit alongside them.
+_SKIP_DIR_RE = re.compile(r"^[._]")
+_MAX_CONTAINER_DEPTH = 3
+
+
+def _subdirs(directory: Path) -> List[Path]:
+    try:
+        return sorted(d for d in directory.iterdir()
+                      if d.is_dir() and not _SKIP_DIR_RE.match(d.name))
+    except OSError:
+        return []
+
+
+def _is_container(directory: Path) -> bool:
+    """True when the directory holds subdirectories but no file of its own.
+
+    An installed game always ships files; a folder without any is a shelf the
+    games sit on, so it must be descended into rather than described.
+    """
+    has_subdir = False
+    try:
+        for entry in directory.iterdir():
+            if entry.is_dir():
+                has_subdir = True
+            elif entry.name != DEFAULT_HTML_FILENAME and not entry.name.startswith("."):
+                return False
+    except OSError:
+        return False
+    return has_subdir
+
+
+def find_game_directories(root: Path, max_depth: int = _MAX_CONTAINER_DEPTH) -> List[Path]:
+    """Game directories under ``root``, descending through launcher libraries."""
+    found: List[Path] = []
+
+    def walk(directory: Path, depth: int) -> None:
+        for sub in _subdirs(directory):
+            if not _is_container(sub):
+                found.append(sub)
+            elif depth < max_depth:
+                walk(sub, depth + 1)
+
+    walk(root, 1)
+    return found
 
 
 async def _cached(cache, namespace, key, factory):
@@ -186,10 +232,13 @@ async def _download_and_rewrite_embedded_images(
     count = 0
     for tag, data_uri in zip(img_tags, await asyncio.gather(*img_tasks)):
         if data_uri:
+            data_uri, blend = flatten_banner(data_uri)
             tag["src"] = data_uri
             for attr in ("width", "height", "style"):
                 if tag.has_attr(attr):
                     del tag[attr]
+            if blend:
+                tag["class"] = tag.get("class", []) + [blend]
             count += 1
 
     log(f"  {D.SUCCESS_DATA} Finished embedded image processing. Successfully processed {count}/{len(images)}.")

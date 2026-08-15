@@ -3,6 +3,53 @@
 All notable changes to this project are documented here.
 This project adheres to [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+- **Filter by publisher in the catalog.** Only studios holding more than one
+  title are listed — a filter whose every entry selects a single item is a
+  list, not a filter. Developers get no dropdown of their own for that exact
+  reason (they are near-unique per game), but both developers and publishers
+  are now matched by the search box, so a one-game studio is still one query
+  away.
+- **Genre icons**, on the game page next to the genre names, on the catalog
+  card and in the catalog's genre filter. Steam's genre vocabulary is small and
+  closed, so each genre gets a glyph; anything outside it gets none rather than
+  a misleading one. The catalog reads genres from an attribute rather than from
+  the cell's text, so the decoration can't reach the filter values.
+
+### Changed
+- A game card fits its rating, genre icons and year on a single line, which is
+  two lines less per card.
+- The Metacritic badge lost its "MC" label: it is the only score shown for
+  games, and the source is on hover.
+- **Animated media on a game page now open on a large centred play button**, as
+  a video player does, instead of a small corner toggle. It clears the picture
+  once playing — pausing is a click anywhere on the media, so there is nothing
+  left to prompt.
+- The catalog's search box names the fields it actually matches, which depend
+  on what the catalog holds (studios for games, folder and cast for videos).
+- **Section headings baked into a store description's images no longer sit on a
+  slab.** They ship as lettering on a flat black or white plate sized for a
+  white store page, and carry no alt text to turn back into a heading, so the
+  plate is erased instead and the lettering meets the page directly. Only wide
+  images whose background is one near-uniform colour qualify; a white one also
+  has to be essentially monochrome, since recovering it means inverting the
+  picture. The plate is flattened to pure black and re-encoded losslessly at
+  generation time — lossy encoding leaves it a few points off, which blending
+  would show as a lighter rectangle on a flat page.
+
+### Fixed
+- **A store launcher's folder was described as a game.** Launchers nest their
+  library one or more levels below the folder they own, so scanning with `-R`
+  produced a page for the launcher itself and none for the games inside it. A
+  directory holding subdirectories but no file of its own is a shelf, not a
+  game, and is now descended into (system folders skipped). A page generated
+  for such a folder by an earlier version stays on disk — delete it, or it
+  keeps its card in the catalog.
+- Studio names were cut at their legal suffix when the catalog read them back,
+  turning a single company into two entries, one of them the suffix alone.
+
 ## [1.6.0] — 2026-08-05
 
 > **Upgrading**: entries cached by an earlier version don't carry the fields

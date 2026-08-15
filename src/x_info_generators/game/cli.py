@@ -15,7 +15,9 @@ from ..processing import RunStats, print_run_summary, cleanup_html_files, format
 from ..index import build_catalog
 from ..utils import format_bytes
 from .. import __version__, REPO_URL
-from .processing import clean_game_title, process_game_directory, DEFAULT_HTML_FILENAME
+from .processing import (
+    clean_game_title, find_game_directories, process_game_directory, DEFAULT_HTML_FILENAME,
+)
 
 USER_AGENT = f"GameInfoGenerator/{__version__} (I'm a kind scraper, called manually and used for personal use <3; +{REPO_URL})"
 
@@ -47,7 +49,7 @@ async def _main_loop(args: argparse.Namespace):
             print(f"{D.WARNING} Path '{path_str}' is not a valid directory. Skipping.")
             continue
         if args.recursive:
-            game_directories.extend(sorted(d for d in current_path.iterdir() if d.is_dir()))
+            game_directories.extend(find_game_directories(current_path))
         else:
             game_directories.append(current_path)
 

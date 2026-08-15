@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Callable, Optional
 
 import aiohttp
-from PIL import Image
+from PIL import Image, ImageOps
 
 from .http import download_file_with_progress
 from .utils import encode_image_to_base64_data_uri
@@ -100,3 +100,64 @@ async def cached_image_data_uri(
         data_uri = optimize_and_encode(temp_path)
     cache.set("image", url, data_uri)
     return data_uri
+
+
+def _luminance(rgb) -> float:
+    return (0.2126 * rgb[0] + 0.7152 * rgb[1] + 0.0722 * rgb[2]) / 255
+
+
+def _saturation(rgb) -> float:
+    top = max(rgb)
+    return 0.0 if not top else (top - min(rgb)) / top
+
+
+_PLATE_TOLERANCE = 14
+
+
+def flatten_banner(data_uri: Optional[str]) -> tuple[Optional[str], str]:
+    """Return ``(data_uri, css_class)`` for a text banner, blending-ready.
+
+    Store descriptions ship their section headings as lettering baked onto a
+    flat black or white plate sized for a white store page, and carry no alt
+    text to turn back into a heading. Erasing the plate is what keeps the words
+    while losing the slab: a white one is inverted, then the plate is snapped to
+    pure black so ``screen`` blending drops it exactly — lossy encoding leaves
+    it a few points off, which shows as a lighter rectangle on a flat page.
+    Inverting is only safe while the banner is essentially monochrome.
+    """
+    if not data_uri or not data_uri.startswith("data:image/"):
+        return data_uri, ""
+    try:
+        raw = base64.b64decode(data_uri.split(",", 1)[1])
+        with Image.open(io.BytesIO(raw)) as img:
+            width, height = img.size
+            if height < 20 or width / height < 4:
+                return data_uri, ""
+            image = img.convert("RGB")
+            sample = image.resize((min(width, 240), min(height, 60)))
+            colors = sample.getcolors(maxcolors=1 << 18)
+            if not colors:
+                return data_uri, ""
+            total = sum(count for count, _ in colors)
+            _, plate = max(colors)
+            # Count the plate with a tolerance: its anti-aliased edges and the
+            # encoder's own noise spread it over near-identical values, and an
+            # exact match undercounts it by half.
+            plate_share = sum(count for count, rgb in colors
+                              if max(abs(a - b) for a, b in zip(rgb, plate)) <= _PLATE_TOLERANCE)
+            if plate_share / total < 0.40:
+                return data_uri, ""
+            light = _luminance(plate)
+            if light > 0.88:
+                mono = sum(c * _saturation(rgb) for c, rgb in colors) / total
+                if mono >= 0.15:
+                    return data_uri, ""
+                image = ImageOps.invert(image)
+            elif light >= 0.12:
+                return data_uri, ""
+            image = image.point(lambda v: 0 if v <= _PLATE_TOLERANCE else v)
+            buffer = io.BytesIO()
+            image.save(buffer, "WEBP", lossless=True)
+    except Exception:
+        return data_uri, ""
+    return "data:image/webp;base64," + base64.b64encode(buffer.getvalue()).decode(), "bb-blend"
