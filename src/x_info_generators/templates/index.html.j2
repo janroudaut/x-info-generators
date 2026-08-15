@@ -36,6 +36,7 @@ header h1 { color: #569cd6; font-size: 2.2em; margin: 0 0 4px; }
 .flag-code { font-size: 0.85em; font-weight: 600; letter-spacing: 0.03em; }
 .badges { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: auto; padding-top: 6px; }
 .badge { display: inline-flex; align-items: center; gap: 3px; font-size: 0.72em; color: #9a9a9a; white-space: nowrap; }
+.badge.bonus{background:#3a2f1c;border-color:#6b5324;color:#e8c766}
 /* Rating, genre icons and year share one line: the two auto margins split the
    free space evenly, centring the icons between their neighbours. Anything too
    narrow to hold them wraps instead. */
@@ -109,7 +110,7 @@ if (location.hash) {
 {% if all_audio_langs %}
 <select id="lang">
 <option value="all">All languages</option>
-{% for l in all_audio_langs %}<option value="{{ l.value }}">{{ l.value | lang_label }} ({{ l.count }})</option>
+{% for l in all_audio_langs %}<option value="{{ l.value }}">{% set fl = l.value | lang_emoji %}{% if fl %}{{ fl }} {% endif %}{{ l.value | lang_label }} ({{ l.count }})</option>
 {% endfor %}</select>
 {% endif %}
 <select id="sort">
@@ -132,6 +133,7 @@ if (location.hash) {
 {% if e.year or e.runtime %}{% if e.kind != 'game' %}<div class="year">{{ e.year or "" }}{% if e.year and e.runtime %} &middot; {% endif %}{{ e.runtime or "" }}</div>{% endif %}{% endif %}
 {% if e.audio_langs or e.sub_langs %}<div class="tracks">{% if e.audio_langs %}<span title="audio: {{ e.audio_langs | map('lang_label') | join(' ') }}">🔊{% for l in e.audio_langs %} {{ l | lang_svg }}{% endfor %}</span>{% endif %}{% if e.sub_langs %} <span title="subtitles: {{ e.sub_langs | map('lang_label') | join(' ') }}">💬 {% if e.sub_langs | length <= 3 %}{% for l in e.sub_langs %}{{ l | lang_svg }}{% if not loop.last %} {% endif %}{% endfor %}{% else %}{{ e.sub_langs | length }}{% endif %}</span>{% endif %}</div>{% endif %}
 <div class="badges">
+{% if e.bonus %}<span class="badge bonus" title="{{ e.bonus }} bonus disponible(s) dans le dossier Bonus/">🎁 {{ e.bonus }}</span>{% endif %}
 {% if 'tmdb' in e.ratings %}<span class="badge" title="TMDB"><span class="score {{ e.ratings.tmdb | score_color_class }}">{{ e.ratings.tmdb }}</span></span>{% endif %}
 {% if 'imdb' in e.ratings %}<span class="badge">IMDb <span class="score {{ e.ratings.imdb | score_color_class }}">{{ e.ratings.imdb }}</span></span>{% endif %}
 {% if 'rt_critics' in e.ratings %}<span class="badge">🍅 <span class="score {{ e.ratings.rt_critics | score_color_class(100) }}">{{ e.ratings.rt_critics }}%</span></span>{% endif %}

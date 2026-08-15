@@ -9,6 +9,17 @@
 .poster-section { text-align: center; }
 .header-image { max-width: 300px; width: 100%; border-radius: 6px; margin-bottom: 15px; display: block; margin-left: auto; margin-right: auto; }
 .content-section, .screenshots-section, .videos-section { background-color: #333; padding: 20px; border-radius: 6px; margin-bottom: 25px; }
+.bonus-jump { font-size: 0.45em; vertical-align: middle; margin-left: 14px; color: #e8c766;
+              background: #3a2f1c; border: 1px solid #6b5324; border-radius: 4px;
+              padding: 4px 9px; text-decoration: none; white-space: nowrap; }
+.bonus-jump:hover { background: #4a3c24; }
+.bonus-section { background-color: #333; padding: 20px; border-radius: 6px; margin-bottom: 25px; }
+.bonus-count { font-size: 0.6em; vertical-align: middle; color: #e8c766; background: #3a2f1c;
+               border: 1px solid #6b5324; border-radius: 3px; padding: 2px 7px; margin-left: 8px; }
+.bonus-list { list-style: none; padding: 0; margin: 0; }
+.bonus-list li { padding: 7px 0; border-bottom: 1px solid #444; display: flex; justify-content: space-between; gap: 14px; flex-wrap: wrap; }
+.bonus-list li:last-child { border-bottom: none; }
+.bonus-meta { color: #9a9a9a; font-size: 0.85em; display: inline-flex; align-items: center; gap: 6px; }
 .description-content { overflow: hidden; }
 .plot { font-style: italic; }
 .video-card { background-color: #404040; border-radius: 4px; overflow: hidden; transition: transform 0.2s ease, box-shadow 0.2s ease; }
@@ -48,7 +59,7 @@ a.trailer-link:hover { color: #ffc1c1; }
 
 {% block header %}
 <header>
-<h1>{{ data.title }} ({{ data.year | default("N/A") }})</h1>
+<h1>{{ data.title }} ({{ data.year | default("N/A") }}){% if data.bonus %}<a class="bonus-jump" href="#bonus" title="{{ data.bonus | length }} bonus">+ {{ data.bonus | length }} bonus</a>{% endif %}</h1>
 {% if data.alt_title %}<p class="alt-title">{{ data.alt_title }}</p>{% endif %}
 </header>
 {% endblock %}
@@ -106,6 +117,19 @@ a.trailer-link:hover { color: #ffc1c1; }
 </div>
 </main>
 </div>
+
+{% if data.bonus %}
+<section id="bonus" class="bonus-section" data-bonus="{{ data.bonus | length }}">
+<h2>Bonus <span class="bonus-count">{{ data.bonus | length }}</span></h2>
+<ul class="bonus-list">
+{% for b in data.bonus %}
+<li><a href="{{ b.href }}">{{ b.label }}</a>
+<span class="bonus-meta">{% if b.duration %}{{ b.duration | format_duration }}{% endif %}
+{% for l in b.langs %}{% if l != "und" %}{{ l | lang_svg }}{% endif %}{% endfor %}</span></li>
+{% endfor %}
+</ul>
+</section>
+{% endif %}
 
 <section class="screenshots-section">
 <h2>Screenshots</h2>

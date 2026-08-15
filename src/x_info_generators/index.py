@@ -327,6 +327,8 @@ def _iter_html(roots, output_path: Path, max_depth: int = 5):
                 yield f, root
 
 
+BONUS_DIR_NAMES = ("bonus", "extra", "extras")   # folded into the parent title
+
 _KIND_TITLE = {"game": "Games", "movie": "Movies", "series": "Series"}
 
 
@@ -346,13 +348,20 @@ def build_catalog(roots, output_path, log: Callable, max_depth: int = 5,
     entries: List[Dict] = []
     by_kind = {"game": 0, "movie": 0, "series": 0}
     skipped = 0
+    # Extras live in a "Bonus" subfolder: they belong to their film, so they get
+    # a badge on its card instead of cards of their own.
+    bonus_counts: Dict[Path, int] = {}
     bar = tqdm(desc=f"{D.PROCESS} Scanning", unit=" file", leave=True)
     for f, scan_root in _iter_html(roots, output_path, max_depth):
         bar.update(1)
+        if f.parent.name.lower() in BONUS_DIR_NAMES:
+            bonus_counts[f.parent.parent] = bonus_counts.get(f.parent.parent, 0) + 1
+            continue
         rec = parse_page(f)
         if not rec:
             skipped += 1
             continue
+        rec["dir"] = f.parent
         rec["href"] = _href(out_dir, f, wsl)
         # Root-relative directories for the search box — videos only. Years are
         # stripped so folder names never leak into text search (that goes
@@ -377,6 +386,14 @@ def build_catalog(roots, output_path, log: Callable, max_depth: int = 5,
         year = f" ({rec['year']})" if rec["year"] else ""
         bar.write(f"  {D.SUCCESS_DATA} [{len(entries)}] {rec['kind']:<6} {rec['title']}{year}")
     bar.close()
+
+    # Attach the extras to their film. Counting happens after the walk because a
+    # Bonus folder can be visited before the film's own page.
+    for rec in entries:
+        rec["bonus"] = bonus_counts.get(rec.pop("dir", None), 0)
+    if bonus_counts:
+        log(f"{D.INFO} {sum(bonus_counts.values())} bonus page(s) folded into "
+            f"{len(bonus_counts)} title(s).")
 
     log(f"{D.INFO} Recognized {len(entries)} page(s), skipped {skipped} (season/other).")
     entries.sort(key=_title_sort_key)

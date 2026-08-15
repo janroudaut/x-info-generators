@@ -154,6 +154,33 @@ def lang_label(code: Optional[str]) -> str:
     return "?" if code in ("", "und") else code.upper()
 
 
+# Country whose flag stands for the language, mirroring flags.py's coverage.
+_LANG_REGION = {
+    "ara": "SA", "ben": "BD", "bul": "BG", "chi": "CN", "cze": "CZ",
+    "dan": "DK", "dut": "NL", "eng": "GB", "est": "EE", "fin": "FI",
+    "fre": "FR", "ger": "DE", "gre": "GR", "heb": "IL", "hin": "IN",
+    "hrv": "HR", "hun": "HU", "ice": "IS", "ind": "ID", "ita": "IT",
+    "jpn": "JP", "kor": "KR", "lav": "LV", "lit": "LT", "may": "MY",
+    "nor": "NO", "per": "IR", "pol": "PL", "por": "PT", "rum": "RO",
+    "rus": "RU", "slo": "SK", "slv": "SI", "spa": "ES", "srp": "RS",
+    "swe": "SE", "tam": "IN", "tel": "IN", "tha": "TH", "tur": "TR",
+    "ukr": "UA", "urd": "PK", "vie": "VN",
+}
+
+
+def lang_emoji(code: Optional[str]) -> str:
+    """Flag emoji for a language, built from regional indicator letters.
+
+    Only for <select> options, which cannot hold the SVG artwork used
+    everywhere else. Windows ships no flag glyphs and will show the bare letter
+    pair instead — a known, accepted trade-off here.
+    """
+    region = _LANG_REGION.get(canon_lang(code))
+    if not region:
+        return ""
+    return "".join(chr(0x1F1E6 + ord(c) - ord("A")) for c in region)
+
+
 def lang_svg(code: Optional[str]) -> str:
     """Inline flag artwork for a language, falling back to its code.
 

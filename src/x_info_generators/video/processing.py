@@ -14,6 +14,7 @@ from ..display import DisplayMode as D
 from ..images import cached_image_data_uri, optimize_and_encode
 from ..processing import ItemStats
 from ..templates import render_template
+from ..utils import format_bytes, run_in_executor
 from .. import __version__
 from .fetchers import (
     fetch_tmdb_search, fetch_tmdb_detail, fetch_tmdb_rating, fetch_tmdb_stills,
@@ -342,6 +343,115 @@ async def _resolve_screenshots(
     return []
 
 
+
+BONUS_DIR = "Bonus"                      # canonical name when we create one
+# Recognised on disk — collections in the wild use either word, either case.
+BONUS_DIR_NAMES = ("bonus", "extra", "extras")
+
+
+def _bonus_html_path(f: Path) -> Path:
+    return f.parent / f"{f.stem}.html"
+
+
+def _collect_bonus(base_dir: Path, strip_prefix: str = "") -> List[Dict[str, Any]]:
+    """Extras sitting in a "Bonus" folder — next to a film, or at a series root.
+
+    Listed on the title's page with a link to each extra's own page; the catalog
+    folds them into a badge instead of giving them cards.
+    """
+    folder = next((d for d in sorted(base_dir.iterdir())
+                   if d.is_dir() and d.name.lower() in BONUS_DIR_NAMES), None)
+    if folder is None:
+        return []
+    prefix = re.escape(strip_prefix) if strip_prefix else r"(?!)"
+    items = []
+    for f in sorted(folder.iterdir()):
+        if not f.is_file() or f.suffix.lower() not in VIDEO_EXTENSIONS:
+            continue
+        # Strip the film's own prefix: "Film (2013) - Entretien" -> "Entretien".
+        label = re.sub(r"^" + prefix + r"\s*[-\u2013]\s*", "", f.stem).strip() or f.stem
+        info = _sync_probe_bonus(f)
+        items.append({
+            "label": label,
+            "href": urllib.parse.quote(f"{folder.name}/{f.stem}.html"),
+            "duration": info.get("duration"),
+            "langs": info.get("langs", []),
+        })
+    return items
+
+
+def _sync_probe_bonus(f: Path) -> Dict[str, Any]:
+    """Duration and audio languages of one extra — cheap ffprobe, no network."""
+    import json as _json
+    import subprocess
+    try:
+        out = subprocess.run(
+            ["ffprobe", "-v", "error", "-show_entries",
+             "format=duration:stream=codec_type:stream_tags=language",
+             "-of", "json", str(f)],
+            capture_output=True, text=True, timeout=60).stdout
+        data = _json.loads(out)
+    except Exception:
+        return {}
+    langs = []
+    for st in data.get("streams", []):
+        if st.get("codec_type") != "audio":
+            continue
+        lang = (st.get("tags", {}).get("language") or "und").lower()
+        if lang not in langs:
+            langs.append(lang)
+    dur = data.get("format", {}).get("duration")
+    return {"duration": float(dur) if dur else None, "langs": langs}
+
+
+
+async def process_bonus_file(video_path: Path, force: bool, max_screenshots: int,
+                             log: Callable, screenshot_source: str = "auto") -> ItemStats:
+    """Technical page for one extra: what the file says about itself, nothing else.
+
+    No TMDB lookup on purpose — an extra is not a released title, and searching
+    for "Entretien, Tilda Swinton" only ever resolves to something wrong.
+    """
+    stats = ItemStats(title=video_path.stem)
+    html_path = _get_html_path(video_path)
+    if html_path.exists() and not force:
+        stats.status = "SKIPPED"
+        return stats
+    temp_dir = Path(tempfile.mkdtemp(prefix="bonusinfo_"))
+    try:
+        media_info = await probe_media_info(video_path, log)
+        probe = await run_in_executor(_sync_probe_bonus, video_path)
+        shots = []
+        if screenshot_source != "off":
+            paths = await generate_screenshots_async(video_path, temp_dir, max_screenshots, log)
+            for p in paths:
+                encoded = await run_in_executor(optimize_and_encode, p)
+                if encoded:
+                    shots.append(encoded)
+        parent = video_path.parent.parent
+        data = {
+            "label": re.sub(r"^" + re.escape(parent.name.split(" [")[0]) + r"\s*[-\u2013]\s*",
+                            "", video_path.stem).strip() or video_path.stem,
+            "filename": video_path.name,
+            "parent_title": parent.name,
+            "duration": probe.get("duration"),
+            "size_human": format_bytes(video_path.stat().st_size),
+            "media_info": media_info,
+            "screenshots": shots,
+        }
+        html_path.write_text(render_template(
+            "bonus_info.html.j2", data=data, generator_name="VideoInfoGenerator",
+            version=__version__, generated_at=time.strftime("%Y-%m-%d %H:%M:%S"),
+        ), encoding="utf-8")
+        stats.status = "SUCCESS"
+        stats.size_bytes = html_path.stat().st_size
+    except Exception as e:
+        log(f"    {D.ERROR} Unexpected error processing bonus '{video_path.name}': {e}")
+        stats.status = "ERROR"
+    finally:
+        shutil.rmtree(temp_dir, ignore_errors=True)
+    return stats
+
 async def process_movie_file(
     session: aiohttp.ClientSession, movie_path: Path,
     force: bool, max_screenshots: int, debug: bool, log: Callable, cache,
@@ -472,6 +582,9 @@ async def process_movie_file(
             log(f"    {D.INFO} Final aggregated data for '{aggregated_data['title']}':")
             printable = {k: (v[:80] + "..." if isinstance(v, str) and len(v) > 80 else v) for k, v in aggregated_data.items()}
             log(json.dumps(printable, indent=2, ensure_ascii=False))
+
+        aggregated_data["bonus"] = _collect_bonus(
+            movie_path.parent, movie_path.stem.split(" [")[0])
 
         # Render and write
         html_output = render_template(
@@ -679,7 +792,8 @@ async def process_series(
             generated_at=time.strftime("%Y-%m-%d %H:%M:%S"),
         )
 
-        # Series page
+        # Series page — extras live at the series root, next to the seasons
+        data["bonus"] = _collect_bonus(item.html_path.parent, data.get("title", ""))
         item.html_path.write_text(
             render_template("series_info.html.j2", data=data, **common),
             encoding="utf-8",

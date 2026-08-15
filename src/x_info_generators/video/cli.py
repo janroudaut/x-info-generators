@@ -18,7 +18,8 @@ from ..index import build_catalog
 from ..utils import format_bytes, path_matches_ignore
 from .. import __version__, REPO_URL
 from .processing import (
-    find_movie_files, process_movie_file, process_series,
+    find_movie_files, process_movie_file, process_series, process_bonus_file,
+    BONUS_DIR_NAMES,
     VIDEO_EXTENSIONS,
 )
 from .discovery import classify_items
@@ -143,7 +144,14 @@ async def _main_loop(args: argparse.Namespace):
                 continue
             print()
 
-            if item.kind == "series":
+            if item.video_path and item.video_path.parent.name.lower() in BONUS_DIR_NAMES:
+                # An extra is not a released title: its page is built from the
+                # file alone, no TMDB lookup.
+                item_stats = await process_bonus_file(
+                    item.video_path, args.force, args.max_screenshots, print,
+                    args.screenshot_source,
+                )
+            elif item.kind == "series":
                 item_stats = await process_series(
                     session, item, args.force, args.max_screenshots, args.debug, print, cache,
                     args.screenshot_source,

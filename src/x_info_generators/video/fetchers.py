@@ -574,9 +574,12 @@ def _sync_generate_screenshots(video_path: Path, output_dir: Path, num_screensho
         timestamp = duration * ((i + 1) / (num_screenshots + 1))
         output_file = output_dir / f"screenshot_{i + 1}.jpg"
         try:
+            # scale=iw*sar:ih — anamorphic sources (DVD rips: 720x576 stored,
+            # 16:9 on screen) hand back squashed frames without it.
             (
                 ffmpeg.input(str(video_path), ss=timestamp)
-                .output(str(output_file), vframes=1, **{"q:v": 3})
+                .output(str(output_file), vframes=1, vf="scale=iw*sar:ih",
+                        **{"q:v": 3})
                 .overwrite_output()
                 .run(capture_stdout=True, capture_stderr=True)
             )

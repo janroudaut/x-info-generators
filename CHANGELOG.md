@@ -6,6 +6,18 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- **Extras get their own place.** A `Bonus/` folder next to a film (or at a
+  series root — `Extra/` and `Extras/` are read too) is no longer catalogued as
+  a set of films: each extra gets a technical page built from the file alone,
+  the title lists them with their duration and languages, and the catalog shows
+  a badge on the parent card instead of a card per extra. No TMDB lookup is made
+  for an extra — it is not a released title, and searching for one only ever
+  resolves to something else. Before this, a making-of was handed the film's own
+  page: its director, its runtime, its plot, for a page three times the size.
+- **Flags in the catalog's audio-language filter.** A `<select>` cannot hold the
+  SVG artwork used on the cards, so these are emoji; Windows ships no flag
+  glyphs and will show the letter pair instead, which is the trade-off for
+  having them there at all. A language with no flag gets no placeholder.
 - **Filter by publisher in the catalog.** Only studios holding more than one
   title are listed — a filter whose every entry selects a single item is a
   list, not a filter. Developers get no dropdown of their own for that exact
@@ -13,10 +25,12 @@ This project adheres to [Semantic Versioning](https://semver.org/).
   are now matched by the search box, so a one-game studio is still one query
   away.
 - **Genre icons**, on the game page next to the genre names, on the catalog
-  card and in the catalog's genre filter. Steam's genre vocabulary is small and
-  closed, so each genre gets a glyph; anything outside it gets none rather than
-  a misleading one. The catalog reads genres from an attribute rather than from
-  the cell's text, so the decoration can't reach the filter values.
+  card and in the catalog's genre filter. Two closed vocabularies are covered —
+  Steam's for games, TMDB's for video — which only overlap on action/adventure;
+  covering just the first left most film cards iconless. Anything outside both
+  gets none rather than a misleading one. The catalog reads genres from an
+  attribute rather than from the cell's text, so the decoration can't reach the
+  filter values.
 
 ### Changed
 - A game card fits its rating, genre icons and year on a single line, which is
@@ -40,6 +54,12 @@ This project adheres to [Semantic Versioning](https://semver.org/).
   would show as a lighter rectangle on a flat page.
 
 ### Fixed
+- **Screenshots of anamorphic sources were squashed.** A DVD stores 720x576
+  pixels meant to be shown as 16:9; the frame was grabbed raw, so faces came out
+  stretched — 42% off on a PAL source. Screenshots now apply the sample aspect
+  ratio. Modern rips are unaffected (their pixels are already square). Note that
+  re-running with `--force` alone will not redraw them: screenshots are cached
+  per file, so `--update-cache` is needed to pick the fix up on existing pages.
 - **A store launcher's folder was described as a game.** Launchers nest their
   library one or more levels below the folder they own, so scanning with `-R`
   produced a page for the launcher itself and none for the games inside it. A

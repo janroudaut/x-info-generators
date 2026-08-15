@@ -1,0 +1,58 @@
+{# Extras (making-of, interviews) have no catalog entry anywhere: every field
+   here is read from the file itself, never from TMDB. The title suffix is
+   deliberately NOT "- Movie Info", so index.py skips these pages. #}
+{% extends "base.html.j2" %}
+
+{% block title %}{{ data.label }} - Bonus{% endblock %}
+
+{% block extra_css %}
+<style>
+.content-section, .screenshots-section { background-color: #333; padding: 20px; border-radius: 6px; margin-bottom: 25px; }
+.details-table { width: 100%; border-collapse: collapse; }
+.details-table th, .details-table td { padding: 8px 10px; text-align: left; vertical-align: top; border-bottom: 1px solid #444; }
+.details-table th { color: #9a9a9a; font-weight: 600; white-space: nowrap; width: 1%; }
+.track { display: inline-flex; align-items: center; gap: 4px; margin-right: 10px; }
+.parent-link { color: #8ab4f8; }
+.screenshots-container { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 12px; }
+.screenshots-container a { display: block; }
+.screenshots-container img { width: 100%; border-radius: 4px; display: block; }
+.kindtag { font-size: 0.55em; vertical-align: middle; color: #e8c766; border: 1px solid #6b5324;
+           background: #3a2f1c; border-radius: 3px; padding: 2px 6px; margin-left: 10px; }
+</style>
+{% endblock %}
+
+{% block header %}
+<h1>{{ data.label }}<span class="kindtag">BONUS</span></h1>
+{% if data.parent_title %}<p class="parent-link">Supplément de {{ data.parent_title }}</p>{% endif %}
+{% endblock %}
+
+{% block content %}
+<main class="content-section">
+<table class="details-table">
+<tr><th>Fichier</th><td>{{ data.filename }}</td></tr>
+{% if data.duration %}<tr><th>Durée</th><td>{{ data.duration | format_duration }}</td></tr>{% endif %}
+<tr><th>Taille</th><td>{{ data.size_human }}</td></tr>
+{% if data.media_info %}
+{% set mi = data.media_info %}
+{% if mi.video %}<tr><th>Résolution</th><td>{{ mi.video.width }}×{{ mi.video.height }}{% if mi.video.label %} ({{ mi.video.label }}){% endif %}{% if mi.video.codec %} &middot; {{ mi.video.codec }}{% endif %}</td></tr>{% endif %}
+{% if mi.audio %}<tr><th>Audio</th><td data-audio-langs="{{ mi.audio | map(attribute='lang') | unique | join('|') }}">
+{% for a in mi.audio %}<span class="track">{{ a.lang | lang_svg }}{% set alabel = a.title or ("" if a.lang == "und" else a.lang) %}{% if alabel %} {{ alabel }}{% endif %}{% if a.codec %} &middot; {{ a.codec }}{% endif %}{% if a.channels %} {{ a.channels }}{% endif %}{% if a.count and a.count > 1 %} ×{{ a.count }}{% endif %}</span>{% endfor %}</td></tr>{% endif %}
+{% if mi.subtitles %}
+{% set sub_langs = mi.subtitles | map(attribute='lang') | unique | list %}
+<tr><th>Sous-titres</th><td data-subtitle-langs="{{ sub_langs | join('|') }}">
+{% for s in mi.subtitles %}<span class="track">{{ s.lang | lang_svg }}{% if s.title %} {{ s.title }}{% endif %}{% if s.count and s.count > 1 %} ×{{ s.count }}{% endif %}</span>{% endfor %}</td></tr>{% endif %}
+{% endif %}
+</table>
+</main>
+
+<section class="screenshots-section">
+<h2>Captures</h2>
+<div class="screenshots-container">
+{% if data.screenshots %}
+{% for src in data.screenshots %}<a data-lightbox="{{ src }}"><img src="{{ src }}" alt="Capture de {{ data.label }}" loading="lazy"></a>{% endfor %}
+{% else %}
+<p>Aucune capture disponible.</p>
+{% endif %}
+</div>
+</section>
+{% endblock %}
