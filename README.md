@@ -27,9 +27,10 @@ That is exactly how the game pages in this demo were produced: from a
 possessing any game, movie, or file.
 
 The same applies to `gen-video-info` for movies and series — the metadata
-comes from public sources (TVmaze, imdbapi.dev, Wikipedia, …). The only
-feature that touches a local file is the optional screenshot extraction
-(FFmpeg), which is skipped when no video file is present.
+comes from public sources (TVmaze, TMDB, Rotten Tomatoes, Wikipedia, …).
+What a local file adds is purely technical: the resolution, the audio and
+subtitle tracks, and the screenshots grabbed with FFmpeg. The video pages in
+this demo were built over such files, which is why they carry that section.
 
 ## Source & documentation
 
