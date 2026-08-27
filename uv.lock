@@ -973,7 +973,7 @@ sdist = { url = "https://files.pythonhosted.org/packages/67/35/25e68fbc99e672127
 
 [[package]]
 name = "x-info-generators"
-version = "1.7.0"
+version = "1.7.1"
 source = { editable = "." }
 dependencies = [
     { name = "aiohttp" },

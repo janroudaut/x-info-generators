@@ -98,6 +98,21 @@ def sanitize_search_term(name: str) -> str:
     return re.sub(r"\s{2,}", " ", name.translate(_SEARCH_NOISE)).strip()
 
 
+_ACRONYM_REGEX = re.compile(r'\b(?:[A-Za-z]\.){2,}')
+
+
+def _dots_to_spaces(name: str) -> str:
+    """Release names use dots as separators — acronyms do not: "W.M.D" and
+    "S.T.A.L.K.E.R." must keep theirs, or the store is asked for another game."""
+    out, last = [], 0
+    for m in _ACRONYM_REGEX.finditer(name):
+        out.append(name[last:m.start()].replace('.', ' '))
+        out.append(m.group(0))
+        last = m.end()
+    out.append(name[last:].replace('.', ' '))
+    return ''.join(out)
+
+
 def clean_game_title(raw_name: str) -> str:
     """Cleans a directory name to get a better game title for searching."""
     name = re.sub(r'\[.*?\]', '', raw_name)
@@ -112,7 +127,7 @@ def clean_game_title(raw_name: str) -> str:
         name = re.sub(tag_pattern, '', name, flags=re.IGNORECASE)
     name = re.sub(r'\s*\(.*?\)\s*', ' ', name)
     name = sanitize_search_term(name)
-    name = name.replace('.', ' ').replace('_', ' ')
+    name = _dots_to_spaces(name).replace('_', ' ')
     # Windows dir names can't contain ":", so a subtitle "Game: Subtitle" is stored
     # as "Game - Subtitle". Restore the colon: Steam search returns nothing for the
     # " - " form but matches on ":".

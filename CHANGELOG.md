@@ -5,6 +5,24 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.7.1] — 2026-08-27
+
+### Fixed
+- **A folder resolved to the wrong game on Steam.** The store ranks a sequel or
+  a knockoff above the game itself often enough that its first result cannot be
+  trusted, and the exact-match test that was meant to catch this compared raw
+  names: the store writes "Thimbleweed Park™", a folder cannot, so the test
+  never fired and the page came back as *Thimbleweed Park 2*. Titles are now
+  compared without punctuation or trademark symbols, and a result whose name
+  merely *starts* with the folder's is preferred over the store's own ranking —
+  which is what tells "GRIP: Combat Racing" from "Half Grip". When nothing
+  matches, the fallback is unchanged but says so in the log.
+- **Acronyms lost their dots.** A release name uses dots as separators, so they
+  were all turned into spaces — which also renamed *Worms W.M.D* into "Worms
+  W M D", both in the search and on the page. A dot flanked by single letters
+  belongs to an acronym and is now kept, leaving *S.T.A.L.K.E.R.* and
+  *F.E.A.R.* intact too.
+
 ## [1.7.0] — 2026-08-15
 
 ### Added

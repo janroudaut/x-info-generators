@@ -14,6 +14,26 @@ from .. import __version__, REPO_URL
 USER_AGENT = f"GameInfoGenerator/{__version__} (I'm a kind scraper, called manually and used for personal use <3; +{REPO_URL})"
 
 
+def _match_key(name: str) -> str:
+    """Comparable form of a store title: no ™/®, no punctuation, single spaces."""
+    return re.sub(r"[^a-z0-9]+", " ", name.lower()).strip()
+
+
+def _pick_store_item(items: List[Dict[str, Any]], game_title: str) -> Dict[str, Any]:
+    """The search result that is the game asked for.
+
+    Steam ranks a sequel or a knockoff above the game itself often enough that
+    the first result cannot be trusted: "Thimbleweed Park" leads with
+    "Thimbleweed Park 2". Match on the punctuation-free form (the store name
+    carries ™ and colons a folder name cannot), then on a full leading word,
+    which is what tells "GRIP: Combat Racing" from "Half Grip".
+    """
+    key = _match_key(game_title)
+    return (next((i for i in items if _match_key(i.get("name", "")) == key), None)
+            or next((i for i in items if _match_key(i.get("name", "")).startswith(key + " ")), None)
+            or items[0])
+
+
 async def fetch_steam_data(session: aiohttp.ClientSession, game_title: str, log) -> Optional[Dict[str, Any]]:
     log(f"    {D.QUERY} Steam: Querying for '{game_title}'...")
     search_url = f"https://store.steampowered.com/api/storesearch/?term={urllib.parse.quote(game_title)}&l=english&cc=US"
@@ -26,13 +46,10 @@ async def fetch_steam_data(session: aiohttp.ClientSession, game_title: str, log)
                 return None
             search_results = await response.json()
             if search_results.get("total", 0) > 0 and search_results.get("items"):
-                best_match = None
-                for item in search_results["items"]:
-                    if game_title.lower() == item.get("name", "").lower():
-                        best_match = item
-                        break
-                if not best_match:
-                    best_match = search_results["items"][0]
+                best_match = _pick_store_item(search_results["items"], game_title)
+                if _match_key(best_match.get("name", "")) != _match_key(game_title):
+                    log(f"    {D.WARNING} Steam: no exact match for '{game_title}', "
+                        f"using '{best_match.get('name')}'.")
                 app_id = best_match.get("id")
                 if not game_data.get("name"):
                     game_data["name"] = best_match.get("name")
